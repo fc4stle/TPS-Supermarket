@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% set judul = 'Integrasi Data' %}
+{% set sub = 'Back end penghubung DSS dengan TPS, OAS, KMS, dan MIS MartOffice: sinkronisasi data, API, dan database SQLite.' %}
+{% block isi %}
+<div class="kpis">
+  <div class="kpi {{ 'g' if mo and not mo._offline else 'y' if mo else 'r' }}"><div class="kpi-top"><span class="kpi-ic">🔗</span></div><small>Koneksi MartOffice</small><strong>{{ 'Terhubung' if mo and not mo._offline else 'Snapshot' if mo else 'Terputus' }}</strong><em>{{ home }}/api/dss_data.php</em></div>
+  <div class="kpi b"><div class="kpi-top"><span class="kpi-ic">🕒</span></div><small>Data terakhir</small><strong>{{ mo._waktu[11:16] if mo else '–' }}</strong><em>{{ mo._waktu|tgl(false) if mo else 'belum pernah' }}</em></div>
+  <div class="kpi p"><div class="kpi-top"><span class="kpi-ic">⚡</span></div><small>Cache</small><strong>{{ cache }} detik</strong><em>data diambil ulang bila lebih lama</em></div>
+  <div class="kpi o"><div class="kpi-top"><span class="kpi-ic">🗄️</span></div><small>Database DSS</small><strong>SQLite</strong><em>{{ db_path }} · {{ tabel|length }} tabel</em></div>
+</div>
+
+<section class="card">
+  <div class="card-h"><h3>📥 Data yang Diambil dari Empat Modul MartOffice</h3>
+    <form method="post" class="inline"><input type="hidden" name="_token" value="{{ csrf }}"><button class="sm">🔄 Sinkronkan sekarang</button></form></div>
+  {% if mo %}
+  <div class="src">
+    <div><small>🧾 TPS</small><b>{{ mo.tps|length }} kategori</b><small>omzet 30 hari, tren, stok menipis/habis, restok</small><small><code>produk</code> <code>transaksi</code> <code>detail_transaksi</code> <code>stok_log</code></small></div>
+    <div><small>📈 MIS</small><b>{{ mo.mis.jumlah_peringatan }} peringatan</b><small>omzet 7 hari {{ mo.mis.omzet_7|rp }}</small><small><code>mis_penjualan_harian</code> + aturan peringatan MIS</small></div>
+    <div><small>📋 OAS</small><b>{{ mo.oas.dokumen|length }} dokumen · {{ mo.oas.tugas|length }} tugas</b><small>dokumen pemasok &amp; tugas pengadaan</small><small><code>dokumen</code> <code>tugas</code></small></div>
+    <div><small>📚 KMS</small><b>{{ mo.kms.artikel|length }} knowledge</b><small>SOP penerimaan barang, retur, stok</small><small><code>artikel_kms</code> <code>feedback_kms</code></small></div>
+  </div>
+  <p class="hint">Data dipakai untuk: menambah kategori supplier otomatis (TPS), menentukan prioritas evaluasi (TPS &amp; MIS), menyarankan sumber bukti penilaian (OAS), dan memberi acuan SOP saat menilai kualitas dan retur (KMS).</p>
+  {% else %}
+    <div class="empty"><div class="empty-ic">🔌</div><b>Belum ada data dari MartOffice</b><p>Pastikan Apache XAMPP menyala, lalu klik Sinkronkan sekarang.</p></div>
+  {% endif %}
+</section>
+
+<section class="card tight">
+  <div class="card-h"><h3>🔌 Endpoint Integrasi</h3><span class="hint">semua pertukaran data memakai tanda tangan HMAC-SHA256 dengan SSO_SECRET</span></div>
+  <div class="table-wrap"><table class="endpoint">
+    <thead><tr><th>Arah</th><th>Endpoint</th><th>Keamanan</th><th>Fungsi</th></tr></thead>
+    <tbody>
+      <tr><td>MartOffice → DSS</td><td><code>GET /sso?token=…</code></td><td>token HMAC, 60 detik, jti sekali pakai, role</td><td>Single Sign-On: membuat sesi DSS tanpa login ulang</td></tr>
+      <tr><td>DSS → MartOffice</td><td><code>GET api/dss_data.php?ts&amp;sig</code></td><td>HMAC(ts), toleransi 120 detik</td><td>Mengambil data TPS, MIS, OAS, dan KMS</td></tr>
+      <tr><td>MartOffice → DSS</td><td><code>GET /api/ringkasan?ts&amp;sig</code></td><td>HMAC(ts)</td><td>Juara per kategori &amp; keputusan terakhir untuk kartu Beranda</td></tr>
+      <tr><td>MartOffice → DSS</td><td><code>GET /api/keputusan?ts&amp;sig</code></td><td>HMAC(ts)</td><td>Daftar keputusan untuk panel MIS Executive Dashboard</td></tr>
+      <tr><td>MartOffice → DSS</td><td><code>GET /sso/keluar?next&amp;ts&amp;sig</code></td><td>HMAC(next|ts)</td><td>Single sign-out lalu kembali ke login MartOffice</td></tr>
+      <tr><td>Publik</td><td><code>GET <a href="{{ url_for('api_status') }}" target="_blank">/api/status</a></code></td><td>tanpa data sensitif</td><td>Memeriksa layanan DSS berjalan dan jumlah data per tabel</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<div class="grid g-23">
+  <section class="card tight">
+    <div class="card-h"><h3>🧾 Riwayat Sinkronisasi</h3><span class="hint">tabel <code>sinkron</code></span></div>
+    {% if log %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Waktu</th><th>Status</th><th>Pemicu</th><th class="num">Durasi</th><th>Ringkasan</th></tr></thead>
+      <tbody>{% for r in log %}
+        <tr><td class="nowrap">{{ r.waktu|tgl }}<small class="block">{{ r.waktu[11:19] }}</small></td>
+            <td>{% if r.status == 'berhasil' %}<span class="badge">berhasil</span>{% else %}<span class="badge r">gagal</span>{% endif %}</td>
+            <td>{{ r.pemicu }}</td><td class="num">{{ r.durasi_ms }} ms</td><td><small>{{ r.ringkasan }}</small></td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    {% else %}<div class="empty"><p>Belum ada sinkronisasi.</p></div>{% endif %}
+  </section>
+  <section class="card">
+    <div class="card-h"><h3>🗄️ Tabel SQLite DSS</h3></div>
+    {% for t, n in tabel %}
+      <div class="rank"><span class="no">{{ loop.index }}</span><div class="rb"><b><code>{{ t }}</code></b></div><span class="rv">{{ n }} baris</span></div>
+    {% endfor %}
+  </section>
+</div>
+
+{% if mo %}
+<section class="card">
+  <div class="card-h"><h3>🧪 Contoh Respons api/dss_data.php</h3><span class="hint">potongan data terakhir yang diterima DSS</span></div>
+  <div class="grid g2">
+    <div><small class="block"><b>tps[0]</b></small><div class="json">{{ mo.tps[0]|tojson(indent=2) }}</div></div>
+    <div><small class="block"><b>mis</b></small><div class="json">{{ {'omzet_7': mo.mis.omzet_7, 'omzet_7_lalu': mo.mis.omzet_7_lalu, 'tren_7': mo.mis.tren_7, 'jumlah_peringatan': mo.mis.jumlah_peringatan, 'peringatan_stok': mo.mis.peringatan_stok[:3]}|tojson(indent=2) }}</div></div>
+    <div><small class="block"><b>oas.dokumen[0..1]</b></small><div class="json">{{ mo.oas.dokumen[:2]|tojson(indent=2) }}</div></div>
+    <div><small class="block"><b>kms.artikel[0..1]</b></small><div class="json">{{ mo.kms.artikel[:2]|tojson(indent=2) }}</div></div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

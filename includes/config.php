@@ -27,5 +27,8 @@ define('DSS_URL', 'http://localhost:' . DSS_PORT);      // alamat yang dibuka br
 define('DSS_API', 'http://127.0.0.1:' . DSS_PORT);      // alamat yang dipanggil server PHP
 define('SSO_SECRET', 'martoffice-dss-sso-2026-ganti-kunci-ini');
 define('SSO_TTL', 60);                                  // token SSO berlaku 60 detik
+// DSS dinyalakan otomatis saat tombol "Buka DSS" diklik. Kosongkan agar Python dicari otomatis,
+// atau isi lokasi lengkap, mis. 'C:\\Users\\Lenovo\\AppData\\Local\\Programs\\Python\\Python310\\pythonw.exe'
+define('DSS_PYTHON', '');
 
 date_default_timezone_set('Asia/Jakarta');

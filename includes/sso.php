@@ -61,6 +61,51 @@ function dss_hidup(float $timeout = 0.6): bool
     return true;
 }
 
+/** Lokasi Python untuk menjalankan DSS (pythonw.exe di Windows agar tidak muncul jendela). */
+function dss_python(): ?string
+{
+    if (DSS_PYTHON !== '') return is_file(DSS_PYTHON) ? DSS_PYTHON : null;
+    if (PHP_OS_FAMILY !== 'Windows') {
+        $p = trim((string) @shell_exec('command -v python3 2>/dev/null'));
+        return $p !== '' ? $p : null;
+    }
+    foreach (['pythonw', 'python'] as $nama) {
+        $hasil = (string) @shell_exec('where ' . $nama . ' 2>NUL');
+        foreach (preg_split('/\r?\n/', trim($hasil)) as $p) {
+            $p = trim($p);
+            if ($p === '' || stripos($p, 'WindowsApps') !== false || !is_file($p)) continue;   // lewati alias Microsoft Store
+            $w = preg_replace('/python\.exe$/i', 'pythonw.exe', $p);
+            return is_file($w) ? $w : $p;
+        }
+    }
+    return null;
+}
+
+/**
+ * Menyalakan DSS di latar belakang (tanpa jendela) lalu menunggu sampai port DSS_PORT siap.
+ * Dipanggil oleh sso_dss.php, sehingga pengguna tidak perlu membuka Command Prompt.
+ */
+function dss_nyalakan(int $tunggu = 15): bool
+{
+    if (dss_hidup()) return true;
+    $py = dss_python();
+    if (!$py) return false;
+    $root = realpath(__DIR__ . '/..');
+    $app = $root . DIRECTORY_SEPARATOR . 'dss' . DIRECTORY_SEPARATOR . 'app.py';
+    $log = $root . DIRECTORY_SEPARATOR . 'dss' . DIRECTORY_SEPARATOR . 'dss.log';
+    if (PHP_OS_FAMILY === 'Windows') {
+        pclose(popen('start "DSS MartOffice" /B "' . $py . '" "' . $app . '" > "' . $log . '" 2>&1', 'r'));
+    } else {
+        exec('nohup ' . escapeshellarg($py) . ' ' . escapeshellarg($app) . ' > ' . escapeshellarg($log) . ' 2>&1 &');
+    }
+    $batas = microtime(true) + $tunggu;
+    while (microtime(true) < $batas) {
+        usleep(400000);
+        if (dss_hidup(0.3)) return true;
+    }
+    return false;
+}
+
 /** Ringkasan keputusan dari DSS untuk ditampilkan di MartOffice. null bila DSS tidak berjalan. */
 function dss_ringkasan(): ?array
 {
@@ -74,4 +119,15 @@ function dss_ringkasan(): ?array
     $data = $json ? json_decode($json, true) : null;
     if (is_array($data) && !empty($data['ok'])) $cache = $data;
     return $cache;
+}
+
+/** Daftar keputusan supplier dari DSS untuk panel MIS. null bila DSS tidak berjalan. */
+function dss_keputusan(): ?array
+{
+    if (!dss_hidup()) return null;
+    $ts = time();
+    $ctx = stream_context_create(['http' => ['timeout' => 2, 'ignore_errors' => true]]);
+    $json = @file_get_contents(DSS_API . '/api/keputusan?' . http_build_query(['ts' => $ts, 'sig' => api_sig('dss:keputusan', $ts)]), false, $ctx);
+    $data = $json ? json_decode($json, true) : null;
+    return is_array($data) && !empty($data['ok']) ? $data['keputusan'] : null;
 }

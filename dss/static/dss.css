@@ -165,3 +165,12 @@ table.matrix .cell-in{width:104px;padding:7px 8px}
 table.matrix .bukti-in{min-width:200px;width:100%}
 table.matrix td:first-child{min-width:150px}
 table.matrix th,table.matrix td{padding-left:8px;padding-right:8px}
+.ref{list-style:none;padding:0;margin:8px 0 12px;display:grid;gap:6px;font-size:13px}
+.ref li small{color:var(--mut)}
+.up{color:#15803d;font-weight:700}.down{color:#b91c1c;font-weight:700}
+.json{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:14px;font-family:ui-monospace,Consolas,monospace;font-size:12px;max-height:340px;overflow:auto;white-space:pre}
+.endpoint td code{white-space:nowrap}
+.src{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.src div{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:#fff}
+.src b{display:block;font-size:20px;color:var(--t2)}.src small{display:block}
+@media (max-width:900px){.src{grid-template-columns:1fr 1fr}}

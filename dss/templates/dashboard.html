@@ -6,7 +6,7 @@
   <div>
     <span class="hb-kicker">Halo, {{ user.nama.split()[0] }} · masuk lewat SSO</span>
     <h2>Supplier mana yang paling layak dipilih? 🧭</h2>
-    <p>DSS menilai setiap supplier pada beberapa kriteria, membobotnya sesuai prioritas manajemen, lalu memberi ranking. Data kategori dan prioritas diambil langsung dari TPS MartOffice.</p>
+    <p>DSS menilai setiap supplier pada beberapa kriteria, membobotnya sesuai prioritas manajemen, lalu memberi ranking. Data pendukung diambil langsung dari TPS, MIS, OAS, dan KMS MartOffice.</p>
   </div>
   <div class="hb-fruit" aria-hidden="true">🚚⚖️🏆</div>
 </section>
@@ -51,11 +51,11 @@
 </section>
 
 <section class="card panel">
-    <div class="card-h"><h3>🧾 Prioritas Evaluasi dari Data TPS</h3><span class="badge {{ 'g' if tps else 'r' }}">{{ 'Terhubung ke TPS' if tps else 'TPS tidak terhubung' }}</span></div>
-    {% if tps %}
+    <div class="card-h"><h3>🧾 Prioritas Evaluasi dari Data TPS &amp; MIS</h3>{% if mo %}<span class="badge {{ 'y' if mo._offline else 'g' }}">{{ 'Snapshot ' ~ (mo._waktu|tgl) if mo._offline else 'Terhubung ke MartOffice' }}</span>{% else %}<span class="badge r">MartOffice tidak terhubung</span>{% endif %}</div>
+    {% if mo %}
       <p class="hint mt0">Omzet 30 hari dan stok menipis per kategori diambil dari database MySQL MartOffice melalui API bertanda tangan HMAC. Urutan prioritas: kategori beromzet besar dan banyak stok menipis yang belum pernah atau sudah lama tidak dievaluasi berada paling atas.</p>
       <div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>Kategori produk</th><th class="num">Produk</th><th class="num">Terjual (30 hari)</th><th class="num">Omzet 30 hari</th><th class="num">Stok menipis</th><th class="num">Supplier di DSS</th><th>Status evaluasi</th></tr></thead>
+        <thead><tr><th>#</th><th>Kategori produk</th><th class="num">Produk</th><th class="num">Terjual (30 hari)</th><th class="num">Omzet 30 hari</th><th class="num">Tren</th><th class="num">Stok menipis</th><th class="num">Supplier di DSS</th><th>Status evaluasi</th></tr></thead>
         <tbody>
         {% for p in prioritas %}
           <tr>
@@ -64,18 +64,47 @@
             <td class="num">{{ p.produk }}</td>
             <td class="num">{{ p.qty|angka }}</td>
             <td class="num"><b>{{ p.omzet|rp }}</b></td>
-            <td class="num">{% if p.menipis %}<span class="badge r">{{ p.menipis }}</span>{% else %}0{% endif %}</td>
+            <td class="num">{% if p.tren is none %}–{% elif p.tren >= 0 %}<span class="up">▲ {{ p.tren|angka(1) }}%</span>{% else %}<span class="down">▼ {{ (-p.tren)|angka(1) }}%</span>{% endif %}</td>
+            <td class="num">{% if p.menipis %}<span class="badge r">{{ p.menipis }}{% if p.habis %} · {{ p.habis }} habis{% endif %}</span>{% else %}0{% endif %}</td>
             <td class="num">{{ p.n_supplier }}</td>
             <td><span class="badge {{ p.tone }}">{{ p.status }}</span></td>
           </tr>
         {% endfor %}
         </tbody>
       </table></div>
-      <p class="sumber">Sumber: <code>MartOffice · transaksi</code>, <code>detail_transaksi</code>, <code>produk</code> — diambil {{ tps.waktu|tgl }}</p>
+      <p class="sumber">Sumber: <code>MartOffice · transaksi</code>, <code>detail_transaksi</code>, <code>produk</code>, <code>stok_log</code> — diambil {{ mo._waktu|tgl }} · tren = omzet 30 hari dibanding 30 hari sebelumnya</p>
     {% else %}
       <div class="empty"><div class="empty-ic">🔌</div><b>Data TPS belum dapat diambil</b><p>Pastikan Apache XAMPP menyala dan alamat MartOffice di <code>dss/config.py</code> benar.</p></div>
     {% endif %}
 </section>
+
+{% if mo %}
+<div class="grid g3">
+  <section class="card panel">
+    <div class="card-h"><h3>📈 Dari MIS</h3><a class="btn sm ghost" href="{{ home }}/mis/peringatan.php">Buka MIS ↗</a></div>
+    <div class="mini mt0">
+      <div><small>Omzet 7 hari</small><b>{{ mo.mis.omzet_7|rp }}</b><small>{% if mo.mis.tren_7 is not none %}{{ '▲' if mo.mis.tren_7 >= 0 else '▼' }} {{ mo.mis.tren_7|abs|angka(1) }}% dari minggu lalu{% endif %}</small></div>
+      <div><small>Peringatan aktif</small><b>{{ mo.mis.jumlah_peringatan }}</b><small>lintas TPS, OAS, KMS</small></div>
+    </div>
+    <ul class="ref">{% for a in mo.mis.peringatan_stok %}<li><span class="badge {{ 'r' if a.level == 'kritis' else 'y' if a.level == 'perhatian' else 'n' }}">{{ a.level }}</span> {{ a.judul }}</li>{% endfor %}</ul>
+    <p class="sumber">Sumber: <code>mis_penjualan_harian</code>, peringatan MIS</p>
+  </section>
+  <section class="card panel">
+    <div class="card-h"><h3>📋 Dari OAS</h3><a class="btn sm ghost" href="{{ home }}/oas/dokumen.php">Dokumen ↗</a></div>
+    <small class="block"><b>Dokumen pemasok &amp; pengadaan</b> — dapat dijadikan sumber bukti penilaian</small>
+    <ul class="ref">{% for d in mo.oas.dokumen %}<li>📄 <a href="{{ home }}/oas/unduh.php?id={{ d.id }}">{{ d.judul }}</a> <small>{{ d.kategori }}</small></li>{% else %}<li class="muted">Tidak ada dokumen terkait</li>{% endfor %}</ul>
+    <small class="block"><b>Tugas terkait stok &amp; pemasok</b></small>
+    <ul class="ref">{% for t in mo.oas.tugas[:4] %}<li><span class="badge {{ 'g' if t.status == 'selesai' else 'y' }}">{{ t.status }}</span> {{ t.judul }} <small>· {{ t.staff }}</small></li>{% endfor %}</ul>
+    <p class="sumber">Sumber: <code>dokumen</code>, <code>tugas</code></p>
+  </section>
+  <section class="card panel">
+    <div class="card-h"><h3>📚 Dari KMS</h3><a class="btn sm ghost" href="{{ home }}/kms/index.php">Knowledge ↗</a></div>
+    <small class="block"><b>SOP &amp; knowledge terkait penerimaan barang</b> — acuan saat menilai kualitas &amp; retur</small>
+    <ul class="ref">{% for a in mo.kms.artikel %}<li>📘 <a href="{{ home }}/kms/view.php?id={{ a.id }}">{{ a.judul }}</a> <small>{{ a.dilihat }}× dilihat{% if a.membantu is not none %} · {{ a.membantu }}% membantu{% endif %}</small></li>{% else %}<li class="muted">Tidak ada knowledge terkait</li>{% endfor %}</ul>
+    <p class="sumber">Sumber: <code>artikel_kms</code>, <code>feedback_kms</code></p>
+  </section>
+</div>
+{% endif %}
 
 <section class="card panel">
   <div class="card-h"><h3>🗒️ Keputusan Terbaru</h3><a class="btn sm ghost" href="{{ url_for('keputusan') }}">Semua riwayat →</a></div>

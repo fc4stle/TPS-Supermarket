@@ -6,6 +6,7 @@ dss/dss.db
 dss/.secret_key
 __pycache__/
 *.pyc
+# file yang diunggah pengguna lewat OAS (contoh sim_*.pdf tetap ikut)
 uploads/dokumen/*
 !uploads/dokumen/index.php
 !uploads/dokumen/sim_*.pdf

@@ -77,14 +77,19 @@ def cek_api(nama: str, ts: str, sig: str) -> bool:
     return hmac.compare_digest(tanda_tangan_api(nama, ts_i), sig or "")
 
 
-def ambil_data_tps(home: str | None = None, timeout: float = 3.0):
-    """Mengambil ringkasan kategori dari TPS MartOffice (api/dss_tps.php). Mengembalikan dict atau None."""
+def ambil_data_martoffice(home: str | None = None, timeout: float = 4.0):
+    """
+    Mengambil data TPS, MIS, OAS, dan KMS dari MartOffice (api/dss_data.php).
+    Mengembalikan (data, None) bila berhasil atau (None, pesan_error).
+    """
     base = (home or config.MARTOFFICE_URL).rstrip("/")
     ts = int(time.time())
-    q = urllib.parse.urlencode({"ts": ts, "sig": tanda_tangan_api("tps:kategori", ts)})
+    q = urllib.parse.urlencode({"ts": ts, "sig": tanda_tangan_api("martoffice:data", ts)})
     try:
-        with urllib.request.urlopen(f"{base}/api/dss_tps.php?{q}", timeout=timeout) as r:
+        with urllib.request.urlopen(f"{base}/api/dss_data.php?{q}", timeout=timeout) as r:
             data = json.loads(r.read().decode("utf-8"))
-            return data if data.get("ok") else None
-    except Exception:
-        return None
+    except Exception as ex:  # MartOffice mati, alamat salah, atau tanda tangan ditolak
+        return None, f"{type(ex).__name__}: {ex}"[:200]
+    if not data.get("ok"):
+        return None, data.get("pesan", "Respons tidak valid")
+    return data, None

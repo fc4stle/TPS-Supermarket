@@ -7,7 +7,7 @@
 <section class="card tight">
   <div class="card-h"><h3>📝 Matriks Penilaian · {{ kat.ikon }} {{ kat.nama }}</h3><a class="btn sm ghost" href="{{ url_for('hitung', kategori=kat.id) }}">Hitung SAW →</a></div>
   {% if sups %}
-  <p class="hint pad mt0">📌 Gunakan data penawaran pada <b>periode yang sama</b> untuk semua supplier agar perbandingan adil, dan catat <b>sumber bukti</b> (surat penawaran, hasil uji sampel, catatan pengiriman) untuk setiap supplier.</p>
+  <p class="hint pad mt0">📌 Gunakan data penawaran pada <b>periode yang sama</b> untuk semua supplier agar perbandingan adil, dan catat <b>sumber bukti</b> (surat penawaran, hasil uji sampel, catatan pengiriman) untuk setiap supplier. Kolom bukti menyarankan dokumen pemasok dari <b>OAS MartOffice</b>.</p>
   <form method="post">
     <input type="hidden" name="_token" value="{{ csrf }}">
     <div class="table-wrap"><table class="matrix">
@@ -23,12 +23,13 @@
             {% set v = nilai.get((s.id, k.id)) %}{% if v %}{% set ns.n = ns.n + 1 %}{% endif %}
             <td class="num"><input type="number" step="any" min="0.0001" name="n_{{ s.id }}_{{ k.id }}" value="{{ v|mentah if v else '' }}" class="cell-in" aria-label="{{ s.nama }} {{ k.nama }}"></td>
           {% endfor %}
-          <td><input name="bukti_{{ s.id }}" value="{{ s.bukti or '' }}" maxlength="300" class="bukti-in" placeholder="cth. Surat penawaran No…, uji sampel QC" aria-label="Sumber bukti {{ s.nama }}">{% if s.bukti_diubah %}<small class="block">diperbarui {{ s.bukti_diubah|tgl }}</small>{% endif %}</td>
+          <td><input name="bukti_{{ s.id }}" value="{{ s.bukti or '' }}" maxlength="300" list="dok-oas" class="bukti-in" placeholder="cth. Surat penawaran No…, uji sampel QC" aria-label="Sumber bukti {{ s.nama }}">{% if s.bukti_diubah %}<small class="block">diperbarui {{ s.bukti_diubah|tgl }}</small>{% endif %}</td>
           <td>{% if ns.n == kriteria|length %}<span class="badge">Lengkap</span>{% else %}<span class="badge y">{{ ns.n }}/{{ kriteria|length }}</span>{% endif %}</td>
         </tr>
       {% endfor %}
       </tbody>
     </table></div>
+    <datalist id="dok-oas">{% for d in dok %}<option value="OAS dokumen #{{ d.id }}: {{ d.judul }}">{% endfor %}</datalist>
     <div class="form-actions pad"><button>💾 Simpan Penilaian</button><span class="hint">Kosongkan sel untuk menghapus nilai. Supplier yang belum lengkap tidak diikutkan dalam perhitungan. Sumber bukti ikut tersimpan pada berita acara keputusan.</span></div>
   </form>
   {% else %}

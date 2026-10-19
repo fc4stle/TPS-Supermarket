@@ -9,6 +9,7 @@ Sistem terpadu supermarket: **TPS** (kasir, nota, stok, laporan) + **OAS** (tuga
 
 ## Langkah menjalankan
 1. Buka **XAMPP Control Panel** → klik **Start** pada **Apache** dan **MySQL**.
+   *Agar otomatis:* XAMPP Control Panel → **Config** → centang **Apache** dan **MySQL** di *Autostart of modules*.
 2. Extract zip, lalu salin folder `martoffice` ke `C:\xampp\htdocs\`
    → hasilnya `C:\xampp\htdocs\martoffice\login.php`
 3. Buat database:
@@ -32,24 +33,23 @@ DSS adalah aplikasi terpisah yang berjalan **bersamaan** dengan XAMPP.
 | DSS (Flask) | **5055** |
 
 1. Pastikan Apache dan MySQL XAMPP sudah Start dan MartOffice bisa dibuka.
-2. Buka **Command Prompt** baru, lalu (sesuaikan dengan folder XAMPP Anda, mis. `C:\xampp2\htdocs`):
+2. (Opsional, sekali saja) isi data supplier simulasi. Buka PowerShell/CMD:
    ```
    cd C:\xampp\htdocs\martoffice
-   python dss/app.py
-   ```
-   Biarkan jendela ini tetap terbuka (tekan `Ctrl + C` untuk menghentikan). File database `dss/dss.db` dibuat otomatis.
-3. (Opsional, sekali saja) isi data supplier simulasi di jendela CMD lain:
-   ```
    python dss/data_simulasi.py
    ```
    Untuk mengosongkan lagi: `python dss/data_simulasi.py --kosong`.
-4. Login MartOffice sebagai **manajer** (atau admin) → Beranda → **🔐 Buka DSS (SSO)**. Anda masuk ke `http://localhost:5055` tanpa login ulang.
+3. Login MartOffice sebagai **manajer** (atau admin) → Beranda → **🔐 Buka DSS (SSO)**.
+   **DSS dinyalakan otomatis di latar belakang** (±1–5 detik, tanpa jendela) lalu Anda masuk ke `http://localhost:5055` tanpa login ulang. Tidak perlu membuka Command Prompt.
+
+> Cara manual (bila ingin melihat log di layar): `python dss/app.py` di folder martoffice. Catatan DSS yang dinyalakan otomatis tersimpan di `dss/dss.log`.
+> Bila Python tidak ditemukan otomatis, isi `DSS_PYTHON` di `includes/config.php` dengan lokasi `pythonw.exe` (cek dengan `where python`).
 
 **Single Sign-On:** MartOffice membuat token bertanda tangan HMAC-SHA256 (berlaku 60 detik, sekali pakai) dan DSS memverifikasinya. Kunci `SSO_SECRET` di `includes/config.php` dan `dss/config.py` **harus sama**. Keluar dari salah satu aplikasi otomatis keluar dari keduanya.
 
 **Hak akses DSS:** manajer = semua fitur (ubah bobot, simpan keputusan, hapus); admin = kelola supplier & penilaian, lihat hasil; staff = tidak bisa masuk.
 
-**Menu DSS:** Dashboard (juara per kategori + prioritas dari data TPS), Data Supplier, Kriteria & Bobot, Penilaian, Perhitungan SAW langkah demi langkah, Analisis Sensitivitas, Riwayat Keputusan (cetak/CSV), dan Log SSO.
+**Menu DSS:** Dashboard (juara per kategori, prioritas dari TPS & MIS, referensi dokumen OAS dan SOP KMS), Data Supplier, Kriteria & Bobot, Penilaian, Perhitungan SAW langkah demi langkah, Analisis Sensitivitas, Riwayat Keputusan (cetak/CSV), Integrasi Data (sinkronisasi & API), dan Log SSO. Keputusan DSS juga tampil di **MIS → Executive Dashboard**.
 
 Jika port 5055 sudah dipakai, ganti `PORT` di `dss/config.py` **dan** `DSS_PORT` di `includes/config.php` dengan angka yang sama.
 
@@ -107,7 +107,7 @@ martoffice/
 ├── kms/                  ← knowledge center, tulis, detail, versi, kategori
 ├── mis/                  ← 11 halaman MIS (khusus manajer)
 ├── sso_dss.php           ← pintu Single Sign-On ke DSS
-├── api/dss_tps.php       ← API data TPS untuk DSS (HMAC)
+├── api/dss_data.php      ← API data TPS, MIS, OAS, KMS untuk DSS (HMAC)
 ├── dss/                  ← aplikasi DSS (Flask + SQLite, port 5055)
 │   ├── app.py, sso.py, saw.py, db.py, config.py
 │   ├── data_simulasi.py  ← opsional, supplier contoh
@@ -127,7 +127,8 @@ Password di-hash (bcrypt), semua query memakai prepared statement, token CSRF di
 | Upload gagal | File maks. 5 MB; cek `upload_max_filesize` di php.ini. |
 | Halaman 404 | Pastikan alamatnya `localhost/martoffice/` (nama folder sama dengan URL). |
 | Tampilan polos tanpa font | Font Google butuh internet; tanpa internet tetap jalan dengan font sistem. |
-| "Layanan DSS belum berjalan" | Jalankan `python dss/app.py` dan biarkan jendela CMD terbuka. |
+| "DSS tidak dapat dinyalakan otomatis" | Pastikan `python -m pip install flask` sudah dijalankan; lihat `dss/dss.log`; atau isi `DSS_PYTHON` di `includes/config.php`. |
+| "Not Found … (Ubuntu) Server" | Apache WSL merebut port 80: `wsl sudo service apache2 stop`, lalu Start Apache XAMPP. |
 | `No module named flask` | Jalankan `python -m pip install flask` (pakai `python -m pip`, bukan `pip`). |
 | "Port 5055 sudah dipakai" | Cek `netstat -ano \| findstr :5055`, tutup aplikasinya atau ganti port di kedua file config. |
 | DSS: "Tanda tangan token tidak cocok" | `SSO_SECRET` di `includes/config.php` dan `dss/config.py` berbeda — samakan. |

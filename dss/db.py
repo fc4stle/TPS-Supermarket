@@ -98,6 +98,19 @@ CREATE TABLE IF NOT EXISTS sso_log (
   ip       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_sso_jti ON sso_log(jti);
+
+-- Riwayat sinkronisasi data dari MartOffice (TPS, MIS, OAS, KMS).
+-- Snapshot terakhir dipakai sebagai cache sehingga DSS tetap bisa
+-- menampilkan data walaupun MartOffice sedang tidak aktif.
+CREATE TABLE IF NOT EXISTS sinkron (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  waktu      TEXT NOT NULL,
+  status     TEXT NOT NULL CHECK (status IN ('berhasil','gagal')),
+  pemicu     TEXT,
+  durasi_ms  INTEGER,
+  ringkasan  TEXT,
+  data_json  TEXT
+);
 """
 
 # Kriteria awal pemilihan supplier supermarket (konfigurasi, dapat diubah manajer)

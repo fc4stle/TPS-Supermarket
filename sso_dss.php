@@ -7,8 +7,10 @@
 require __DIR__ . '/includes/app.php';
 need('admin', 'manajer');   // staff tidak memiliki akses DSS
 
-if (!dss_hidup()) {
-    flash('err', 'Layanan DSS belum berjalan. Buka Command Prompt, masuk ke folder <code>martoffice</code>, lalu jalankan <code>python dss/app.py</code> (port ' . DSS_PORT . ').');
+// DSS dinyalakan otomatis bila belum berjalan (tanpa membuka Command Prompt)
+if (!dss_hidup() && !dss_nyalakan()) {
+    flash('err', 'DSS tidak dapat dinyalakan otomatis. Pastikan Python dan Flask terpasang (<code>python -m pip install flask</code>), '
+        . 'lihat catatan error di <code>dss/dss.log</code>, atau jalankan manual: <code>python dss/app.py</code> (port ' . DSS_PORT . ').');
     redirect('beranda.php');
 }
 

@@ -45,6 +45,7 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
 )
 app.teardown_appcontext(db.close_db)
+app.json.ensure_ascii = False   # respons JSON tetap terbaca (emoji & huruf Indonesia tidak di-escape)
 
 BULAN = ["", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
 HARI = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
@@ -189,19 +190,48 @@ def total_bobot():
     return round(db.val("SELECT COALESCE(SUM(bobot),0) FROM kriteria") or 0, 4)
 
 
-def sinkron_kategori(home=None):
-    """Menambahkan kategori produk dari TPS MartOffice yang belum ada di DSS."""
-    data = sso.ambil_data_tps(home)
-    if not data:
-        return None
+CACHE_DETIK = 120  # data MartOffice dianggap masih segar selama 2 menit
+
+
+def data_martoffice(home=None, paksa=False, pemicu="otomatis"):
+    """
+    Mengambil data TPS, MIS, OAS, dan KMS dari MartOffice dengan cache di tabel `sinkron`.
+    Mengembalikan dict data (ditambah kunci _waktu dan _offline) atau None bila belum pernah berhasil.
+    """
+    home = home or (session.get("user") or {}).get("home")
+    terakhir = db.row("SELECT * FROM sinkron WHERE status='berhasil' ORDER BY id DESC LIMIT 1")
+    if terakhir and not paksa:
+        umur = (datetime.now() - datetime.strptime(terakhir["waktu"], "%Y-%m-%d %H:%M:%S")).total_seconds()
+        if umur < CACHE_DETIK:
+            return {**json.loads(terakhir["data_json"]), "_waktu": terakhir["waktu"], "_offline": False}
+    t0 = time.time()
+    data, err = sso.ambil_data_martoffice(home)
+    durasi = int((time.time() - t0) * 1000)
+    if data:
+        ringkas = f"TPS {len(data['tps'])} kategori · MIS {data['mis']['jumlah_peringatan']} peringatan · " \
+                  f"OAS {len(data['oas']['dokumen'])} dokumen, {len(data['oas']['tugas'])} tugas · KMS {len(data['kms']['artikel'])} artikel"
+        db.run("INSERT INTO sinkron (waktu,status,pemicu,durasi_ms,ringkasan,data_json) VALUES (?,?,?,?,?,?)",
+               (db.sekarang(), "berhasil", pemicu, durasi, ringkas, json.dumps(data, ensure_ascii=False)))
+        db.run("DELETE FROM sinkron WHERE id NOT IN (SELECT id FROM sinkron ORDER BY id DESC LIMIT 50)")
+        simpan_kategori(data["tps"])
+        return {**data, "_waktu": db.sekarang(), "_offline": False}
+    db.run("INSERT INTO sinkron (waktu,status,pemicu,durasi_ms,ringkasan) VALUES (?,?,?,?,?)",
+           (db.sekarang(), "gagal", pemicu, durasi, err))
+    if terakhir:  # pakai snapshot terakhir yang berhasil
+        return {**json.loads(terakhir["data_json"]), "_waktu": terakhir["waktu"], "_offline": True}
+    return None
+
+
+def simpan_kategori(tps):
+    """Menambahkan kategori produk TPS yang belum ada di DSS. Mengembalikan jumlah kategori baru."""
     baru = 0
-    for k in data["kategori"]:
+    for k in tps:
         ada = db.row("SELECT id FROM kategori WHERE nama=?", (k["nama"],))
         if ada:
             db.run("UPDATE kategori SET sumber='tps', disinkron=? WHERE id=?", (db.sekarang(), ada["id"]))
         else:
             db.run("INSERT INTO kategori (nama, ikon, sumber, disinkron) VALUES (?,?, 'tps', ?)",
-                   (k["nama"], k.get("ikon") or db.IKON_KATEGORI.get(k["nama"], "📦"), db.sekarang()))
+                   (k["nama"], db.IKON_KATEGORI.get(k["nama"]) or k.get("ikon") or "📦", db.sekarang()))
             baru += 1
     return baru
 
@@ -241,7 +271,7 @@ def sso_masuk():
     session.permanent = True
     session["user"] = {k: payload.get(k) for k in ("sub", "username", "nama", "role", "jabatan", "home")}
     session["csrf"] = secrets.token_hex(16)
-    sinkron_kategori(payload.get("home"))
+    data_martoffice(payload.get("home"), paksa=True, pemicu="login SSO")
     flash("ok", f"Selamat datang, {payload['nama']}! Anda masuk ke DSS lewat Single Sign-On MartOffice.")
     return redirect(url_for("dashboard"))
 
@@ -320,11 +350,12 @@ def dashboard():
                 "n": len(alt), "kurang": len(h["tidak_lengkap"]),
                 "terakhir": db.row("SELECT pemenang_nama, dibuat_pada FROM keputusan WHERE kategori_id=? ORDER BY id DESC LIMIT 1", (k["id"],)),
             })
-    tps = sso.ambil_data_tps(session["user"].get("home"))
+    mo = data_martoffice()
     prioritas = []
-    if tps:
+    if mo:
+        kats = daftar_kategori()
         info = {k["nama"]: k for k in kats}
-        for t in tps["kategori"]:
+        for t in mo["tps"]:
             k = info.get(t["nama"])
             akhir = db.row("SELECT dibuat_pada FROM keputusan WHERE kategori_id=? ORDER BY id DESC LIMIT 1", (k["id"],)) if k else None
             umur = (datetime.now() - datetime.strptime(akhir["dibuat_pada"], "%Y-%m-%d %H:%M:%S")).days if akhir else None
@@ -360,7 +391,7 @@ def dashboard():
     }
     terbaru = db.rows("""SELECT p.*, k.nama kategori, k.ikon FROM keputusan p JOIN kategori k ON k.id=p.kategori_id
                          ORDER BY p.id DESC LIMIT 5""")
-    return render_template("dashboard.html", juara=juara, tps=tps, prioritas=prioritas, langkah=langkah,
+    return render_template("dashboard.html", juara=juara, mo=mo, prioritas=prioritas, langkah=langkah,
                            stat=stat, terbaru=terbaru, active="dashboard")
 
 
@@ -383,9 +414,11 @@ def supplier():
     if request.method == "POST":
         aksi = request.form.get("aksi")
         if aksi == "sinkron":
-            n = sinkron_kategori(session["user"].get("home"))
-            flash("ok" if n is not None else "err",
-                  f"Sinkronisasi kategori dari TPS selesai ({n} kategori baru)." if n is not None
+            sebelum = db.val("SELECT COUNT(*) FROM kategori")
+            mo = data_martoffice(paksa=True, pemicu="tombol sinkron kategori")
+            ok = mo and not mo["_offline"]
+            flash("ok" if ok else "err",
+                  f"Sinkronisasi kategori dari TPS selesai ({db.val('SELECT COUNT(*) FROM kategori') - sebelum} kategori baru)." if ok
                   else "TPS MartOffice tidak dapat dihubungi. Pastikan Apache menyala.")
             return redirect(url_for("supplier"))
         f, err = _form_supplier()
@@ -567,7 +600,9 @@ def penilaian():
         sups = db.rows("SELECT * FROM supplier WHERE kategori_id=? AND aktif=1 ORDER BY kode", (kat["id"],))
         nilai = {(r["supplier_id"], r["kriteria_id"]): r["nilai"] for r in db.rows(
             "SELECT n.* FROM nilai n JOIN supplier s ON s.id=n.supplier_id WHERE s.kategori_id=?", (kat["id"],))}
-    return render_template("penilaian.html", kats=kats, kat=kat, kriteria=kriteria_, sups=sups, nilai=nilai, active="penilaian")
+    mo = data_martoffice()
+    dok = mo["oas"]["dokumen"] if mo else []
+    return render_template("penilaian.html", kats=kats, kat=kat, kriteria=kriteria_, sups=sups, nilai=nilai, dok=dok, active="penilaian")
 
 
 # ---------------- Perhitungan SAW ----------------
@@ -668,6 +703,49 @@ def keputusan_hapus(kid):
     db.run("DELETE FROM keputusan WHERE id=?", (kid,))
     flash("ok", "Riwayat keputusan dihapus.")
     return redirect(url_for("keputusan"))
+
+
+# ---------------- Integrasi data (back end) ----------------
+@app.route("/integrasi", methods=["GET", "POST"])
+@login_wajib()
+def integrasi():
+    if request.method == "POST":
+        mo = data_martoffice(paksa=True, pemicu="tombol sinkron manual")
+        flash("ok" if mo and not mo["_offline"] else "err",
+              "Data TPS, MIS, OAS, dan KMS berhasil diambil ulang dari MartOffice." if mo and not mo["_offline"]
+              else "MartOffice tidak dapat dihubungi; DSS memakai snapshot terakhir.")
+        return redirect(url_for("integrasi"))
+    mo = data_martoffice()
+    log = db.rows("SELECT id,waktu,status,pemicu,durasi_ms,ringkasan FROM sinkron ORDER BY id DESC LIMIT 15")
+    tabel = [(t, db.val(f"SELECT COUNT(*) FROM {t}")) for t in
+             ("pengguna", "kategori", "supplier", "kriteria", "nilai", "keputusan", "sso_log", "sinkron")]
+    return render_template("integrasi.html", mo=mo, log=log, tabel=tabel, active="integrasi",
+                           db_path=os.path.basename(config.DB_PATH), cache=CACHE_DETIK)
+
+
+@app.route("/api/status")
+def api_status():
+    """Status layanan DSS (tanpa data sensitif) — dipakai untuk memeriksa back end berjalan."""
+    akhir = db.row("SELECT waktu, status FROM sinkron ORDER BY id DESC LIMIT 1")
+    return jsonify(
+        ok=True, layanan="DSS MartOffice", metode="Simple Additive Weighting (SAW)",
+        framework="Flask", database="SQLite (" + os.path.basename(config.DB_PATH) + ")", port=config.PORT,
+        waktu_server=db.sekarang(),
+        tabel={t: db.val(f"SELECT COUNT(*) FROM {t}") for t in
+               ("pengguna", "kategori", "supplier", "kriteria", "nilai", "keputusan", "sso_log", "sinkron")},
+        sinkron_terakhir=dict(akhir) if akhir else None,
+    )
+
+
+@app.route("/api/keputusan")
+def api_keputusan():
+    """Daftar keputusan untuk MIS MartOffice (ditandatangani HMAC)."""
+    if not sso.cek_api("dss:keputusan", request.args.get("ts"), request.args.get("sig")):
+        return jsonify(ok=False, pesan="Tanda tangan API tidak valid"), 401
+    rows = db.rows("""SELECT p.id, k.nama kategori, p.judul, p.pemenang_nama, round(p.nilai_v,4) nilai_v,
+                             round(p.nilai_v*100,2) skor, p.dibuat_oleh, p.dibuat_pada
+                      FROM keputusan p JOIN kategori k ON k.id=p.kategori_id ORDER BY p.id DESC LIMIT 20""")
+    return jsonify(ok=True, jumlah=len(rows), keputusan=[dict(r) for r in rows])
 
 
 # ---------------- Log SSO ----------------

@@ -32,6 +32,8 @@ $topKasir = rows("SELECT g.nama, COUNT(*) n, SUM(t.total) omzet FROM transaksi t
 $topKms = rows("SELECT id, judul, dilihat FROM artikel_kms WHERE status='published' ORDER BY dilihat DESC LIMIT 5");
 $stokMenipis = (int) val('SELECT COUNT(*) FROM produk WHERE aktif=1 AND stok<?', [STOK_MIN]);
 $nilaiStok = (float) val('SELECT COALESCE(SUM(harga*stok),0) FROM produk WHERE aktif=1');
+$dssKep = dss_keputusan();          // keputusan supplier dari DSS (Flask, port 5055)
+$dssRing = $dssKep !== null ? dss_ringkasan() : null;
 
 mis_start('Executive Dashboard', 'mis', 'Kinerja perusahaan dalam satu layar — dirangkum dari TPS, OAS, dan KMS.', $per);
 ?>
@@ -108,4 +110,23 @@ mis_start('Executive Dashboard', 'mis', 'Kinerja perusahaan dalam satu layar —
     foreach ($topKms as $i => $p) echo '<div class="rank"><span class="no">' . ($i + 1) . '</span><div class="rb"><b><a href="' . url('kms/view.php?id=' . $p['id']) . '">' . e($p['judul']) . '</a></b></div><span class="rv">' . angka($p['dilihat']) . 'x</span></div>'; ?>
     <?= sumber('artikel_kms') ?></section>
 </div>
+
+<section class="card panel">
+  <div class="card-h"><h3>🧭 Keputusan Supplier dari DSS</h3><a class="btn sm ghost" href="<?= url('sso_dss.php') ?>">Buka DSS ↗</a></div>
+  <?php if ($dssKep === null): ?>
+    <?= empty_state('💤', 'DSS sedang tidak aktif', 'Klik “Buka DSS” — DSS dinyalakan otomatis, lalu keputusan supplier tampil di sini.') ?>
+  <?php else: ?>
+    <div class="grid g-23">
+      <div><?= tabel(['Tanggal', 'Kategori', 'Supplier terpilih', '#Skor', 'Disetujui'], array_map(fn($k) => [
+          tgl($k['dibuat_pada']), e($k['kategori']), '<b>🥇 ' . e($k['pemenang_nama']) . '</b>', number_format($k['skor'], 2, ',', '.'), e($k['dibuat_oleh'])], array_slice($dssKep, 0, 6)),
+          'Belum ada keputusan supplier') ?></div>
+      <div><small class="muted">Juara sementara per kategori (bobot saat ini)</small>
+        <?php foreach (($dssRing['juara'] ?? []) as $i => $j): ?>
+          <div class="rank"><span class="no"><?= e($j['ikon']) ?></span><div class="rb"><b><?= e($j['supplier']) ?></b><small><?= e($j['kategori']) ?></small></div><span class="rv"><?= number_format($j['v'] * 100, 1, ',', '.') ?></span></div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  <?php endif; ?>
+  <?= sumber('DSS · keputusan, supplier, nilai (SQLite) via /api/keputusan') ?>
+</section>
 <?php mis_end();

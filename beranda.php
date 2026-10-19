@@ -64,12 +64,12 @@ echo hero('Lima modul, satu sistem 🛒', 'MartOffice menyatukan transaksi kasir
       <?php if ($angka): ?>
         <dl class="module-stats"><?php foreach ($angka as [$l, $v]) echo '<div><dt>' . e($l) . '</dt><dd>' . $v . '</dd></div>'; ?></dl>
       <?php elseif ($kode === 'DSS' && $boleh): ?>
-        <p class="module-note">⚠️ Layanan DSS belum berjalan. Jalankan <code>python dss/app.py</code> di folder martoffice, lalu muat ulang halaman ini.</p>
+        <p class="module-note">💤 DSS sedang tidak aktif. Klik tombol di bawah — DSS akan <b>dinyalakan otomatis</b> (±5 detik), tanpa perlu membuka Command Prompt.</p>
       <?php else: ?>
         <p class="module-note">Modul ini hanya dapat dibuka oleh akun dengan role <b><?= $kode === 'DSS' ? 'manajer atau admin' : 'manajer' ?></b>.</p>
       <?php endif; ?>
       <?php if ($boleh): ?>
-        <a class="btn block" href="<?= url($href) ?>"><?= $kode === 'DSS' ? '🔐 Buka DSS (SSO) ↗' : 'Buka modul →' ?></a>
+        <a class="btn block" href="<?= url($href) ?>"<?= $kode === 'DSS' ? ' onclick="this.textContent=\'⏳ Membuka DSS…\';this.style.pointerEvents=\'none\'"' : '' ?>><?= $kode === 'DSS' ? '🔐 Buka DSS (SSO) ↗' : 'Buka modul →' ?></a>
       <?php else: ?>
         <button class="block ghost" type="button" disabled data-keep-disabled>🔒 Terkunci</button>
       <?php endif; ?>
