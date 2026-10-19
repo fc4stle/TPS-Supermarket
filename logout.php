@@ -1,6 +1,6 @@
 <?php
-session_start();
-session_destroy();
-header("Location: login.php");
-exit;
-?>
+require __DIR__ . '/includes/app.php';
+$_SESSION = [];
+session_regenerate_id(true);
+flash('ok', 'Anda sudah keluar. Sampai jumpa lagi!');
+redirect('login.php');
