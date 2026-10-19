@@ -1,8 +1,9 @@
 # 🛒 MartOffice — Sistem Informasi Supermarket Terpadu
 
-Aplikasi supermarket berbasis **PHP native + MySQL** yang menggabungkan empat modul:
+Aplikasi supermarket berbasis **PHP native + MySQL** yang menggabungkan modul:
 **TPS** (kasir, nota, stok, laporan penjualan), **OAS** (tugas, pengumuman, agenda, dokumen, pesan internal),
-**KMS** (knowledge base dengan review, versi, dan feedback), dan **MIS** (11 halaman analitik kinerja khusus manajer).
+**KMS** (knowledge base dengan review, versi, dan feedback), **MIS** (11 halaman analitik kinerja khusus manajer),
+dan **DSS** (pemilihan supplier terbaik metode SAW — aplikasi **Flask + SQLite** di port 5055 yang terhubung lewat **Single Sign-On**).
 
 **Dibuat oleh:** Alysa Salsabila Irfan Putri (24051130049) — TI-J, Universitas Negeri Yogyakarta
 
@@ -11,6 +12,7 @@ Aplikasi supermarket berbasis **PHP native + MySQL** yang menggabungkan empat mo
 2. Salin folder ini ke `htdocs` dengan nama `martoffice`.
 3. Import `database.sql` (opsional: lalu `data_simulasi.sql` untuk data contoh MIS).
 4. Buka `http://localhost/martoffice/`.
+5. DSS: `python -m pip install flask`, lalu `python dss/app.py` (opsional: `python dss/data_simulasi.py`). Masuk lewat kartu DSS di Beranda.
 
 Akun: `admin/admin123`, `manajer/manajer123`, `staff/staff123`. Panduan lengkap ada di [PANDUAN.md](PANDUAN.md).
 

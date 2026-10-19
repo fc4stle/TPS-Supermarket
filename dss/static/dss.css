@@ -1,0 +1,167 @@
+/* =========================================================
+   DSS MartOffice — tambahan tema di atas style.css MartOffice
+   Aksen teal-biru untuk membedakan modul pendukung keputusan
+   ========================================================= */
+.dss{--t:#0f766e;--t2:#115e59;--tl:#ccfbf1;--txl:#f0fdfa;--ind:#4338ca;--indl:#e0e7ff}
+.dss .side{background:linear-gradient(180deg,#134e4a 0%,#115e59 50%,#0f766e 100%)}
+.dss .brand .logo{background:#5eead4;box-shadow:0 4px 0 #0d9488}
+.dss .brand i{color:#5eead4}.dss .brand small{color:#99f6e4}
+.dss .menu-label{color:#5eead4}
+.dss .menu a.on{color:var(--t2)}
+.menu .ext{opacity:.6;font-size:12px}
+.sso-chip{font-size:11.5px;font-weight:700;color:#ccfbf1;background:rgba(255,255,255,.08);border:1px dashed rgba(255,255,255,.25);border-radius:10px;padding:6px 10px;text-align:center}
+.dss-strip{background:repeating-linear-gradient(135deg,#99f6e4 0 18px,#5eead4 18px 36px);color:#134e4a}
+.dss .role-pill.manajer{background:var(--tl);color:var(--t2)}
+.dss-hero{background:linear-gradient(120deg,#134e4a,#0f766e 55%,#0d9488)!important}
+.dss-hero p{color:#ccfbf1!important}
+.dss-hero::after{background:rgba(94,234,212,.25)!important}
+
+/* utilitas */
+small.block,.block{display:block}
+.center{text-align:center}
+.pad{padding:0 20px 16px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chips.pad{padding:4px 20px 14px}
+.chip small{opacity:.7;margin-left:2px}
+.kat-chips{margin-bottom:16px}
+.g-side-r{grid-template-columns:minmax(0,1fr) 340px;align-items:start}
+.g-side-r>aside{display:flex;flex-direction:column}
+.span2{grid-column:1/-1}
+.narrow{max-width:760px}
+.muted-row td{opacity:.55}
+.inline input{width:auto;min-width:220px;padding:7px 12px}
+.empty.sm{padding:14px 6px}
+.card-h .chips .chip{padding:5px 11px;font-size:12.5px}
+
+/* langkah alur */
+.steps{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;border:1.5px dashed var(--line);background:#fff;color:var(--ink);text-decoration:none!important;flex:1;min-width:150px}
+.step .no{width:28px;height:28px;border-radius:50%;background:#eef2f0;display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}
+.step b{font-size:13px}
+.step.done{border-style:solid;border-color:#99f6e4;background:var(--txl)}
+.step.done .no{background:var(--t);color:#fff}
+.step-arrow{color:var(--mut);font-weight:800}
+
+/* juara per kategori */
+.champs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.champ{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:16px;padding:14px;color:var(--ink);text-decoration:none!important;transition:.15s;background:#fff}
+.champ:hover{border-color:#5eead4;box-shadow:0 8px 20px rgba(15,118,110,.12);transform:translateY(-2px)}
+.champ-h{display:flex;gap:10px;align-items:center}
+.champ-ic{width:40px;height:40px;border-radius:12px;background:var(--txl);display:grid;place-items:center;font-size:21px;flex:none}
+.champ-h b{display:block;font-size:14px}.champ-h small{font-size:11.5px}
+.champ-win{display:flex;gap:10px;align-items:center;background:linear-gradient(90deg,#fef9c3,#fffbeb);border-radius:12px;padding:10px}
+.champ-win .medal{font-size:24px}
+.champ-win b{display:block;font-size:13.5px;color:#713f12}.champ-win small{font-size:11.5px;color:#92400e}
+.champ-foot{font-size:11.5px;border-top:1px dashed var(--line);padding-top:8px}
+
+/* meter kelengkapan */
+.meter{height:6px;background:#eef2f0;border-radius:6px;overflow:hidden;width:90px;margin-bottom:3px}
+.meter i{display:block;height:100%;background:var(--y)}
+.meter i.full{background:var(--t)}
+.kat-list{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:6px;font-size:13px}
+.kat-list li{display:flex;justify-content:space-between;align-items:center}
+
+/* kriteria */
+.bobot-in{width:110px;text-align:right;padding:7px 10px}
+.wbar{display:flex;height:30px;border-radius:10px;overflow:hidden;margin-top:14px;gap:2px}
+.wbar i{display:grid;place-items:center;color:#fff;font-style:normal;font-size:11.5px;font-weight:800;min-width:0;overflow:hidden;transition:flex .2s}
+.wbar .w0{background:#0f766e}.wbar .w1{background:#16a34a}.wbar .w2{background:#2563eb}.wbar .w3{background:#f97316}.wbar .w4{background:#7c3aed}.wbar .w5{background:#ca8a04}
+.radio-card small{display:block;font-weight:500;font-size:11px;color:var(--mut)}
+.radio-card{flex-wrap:wrap}
+.formula .f-box{border-left:4px solid var(--g);background:var(--gxl);border-radius:0 12px 12px 0;padding:10px 14px;margin-bottom:10px}
+.formula .f-box.o{border-color:var(--o);background:#fff7ed}.formula .f-box.p{border-color:var(--ind);background:#eef2ff}
+.formula .f-box b{display:block;font-size:13px}
+.formula .f-box span{display:block;font-family:Georgia,'Times New Roman',serif;font-size:16px;margin:4px 0;color:var(--ink)}
+.formula .f-box small{font-size:11.5px}
+
+/* matriks */
+table.matrix th small.block{font-weight:500;font-size:11px;color:var(--mut);text-transform:none;letter-spacing:0}
+table.matrix th .badge{margin-top:4px;font-size:10.5px;padding:1px 8px}
+table.matrix td.best{background:#dcfce7;color:var(--g3);font-weight:800}
+table.matrix tfoot th{background:#f8faf9;font-size:12px}
+.cell-in{width:110px;text-align:right;padding:7px 10px;margin-left:auto;display:block}
+.guide{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;font-size:13px}
+.stepno{width:26px;height:26px;border-radius:8px;background:var(--t);color:#fff;display:inline-grid;place-items:center;font-size:13px;font-weight:800}
+
+/* kartu juara */
+.winner{display:flex;align-items:center;gap:18px;background:linear-gradient(110deg,#fef9c3,#fde68a 60%,#fcd34d);border-radius:20px;padding:20px 24px;margin-bottom:20px;box-shadow:0 10px 26px rgba(202,138,4,.18)}
+.winner .w-medal{font-size:52px;line-height:1}
+.winner .w-body{flex:1}
+.winner small{font-weight:700;color:#92400e;text-transform:uppercase;font-size:11.5px;letter-spacing:.06em}
+.winner h2{font-size:26px;color:#713f12;margin:2px 0 4px}
+.winner p{margin:0;color:#78350f}
+.winner.sm{padding:14px 18px;box-shadow:none}.winner.sm h2{font-size:21px}.winner.sm .w-medal{font-size:40px}
+
+/* ranking */
+.ranking{display:flex;flex-direction:column;gap:10px}
+.rk{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:14px;border:1px solid var(--line)}
+.rk.top{background:#fffbeb;border-color:#fde68a}
+.rk-no{width:34px;text-align:center;font-size:20px;font-weight:800;color:var(--mut)}
+.rk-body{flex:1;min-width:0}
+.rk-head{display:flex;justify-content:space-between;gap:10px}
+.rk-v{font-weight:800;color:var(--t2)}
+.rk-bar{height:10px;background:#eef2f0;border-radius:6px;overflow:hidden;margin:6px 0 4px}
+.rk-bar i{display:block;height:100%;background:linear-gradient(90deg,#14b8a6,#0f766e);border-radius:6px;transition:width .25s}
+.rk.top .rk-bar i{background:linear-gradient(90deg,#facc15,#ca8a04)}
+.rk-f{font-size:11.5px;font-family:ui-monospace,Consolas,monospace;word-break:break-word}
+.move{font-size:11px;font-weight:800;border-radius:10px;padding:1px 6px;margin-left:4px}
+.move.up{background:#dcfce7;color:#15803d}.move.down{background:#fee2e2;color:#b91c1c}
+
+/* sensitivitas */
+.slider{display:grid;grid-template-columns:1fr 54px;align-items:center;gap:4px 12px;margin-bottom:12px}
+.slider label{grid-column:1/-1;margin:0}
+.slider input[type=range]{padding:0;accent-color:var(--t);border:0;background:none;height:22px}
+.slider b{text-align:right;color:var(--t2)}
+.range{position:relative;height:10px;background:#fee2e2;border-radius:6px;width:160px;margin-bottom:3px}
+.range i{position:absolute;top:0;bottom:0;background:#86efac;border-radius:6px}
+.range b{position:absolute;top:-3px;width:4px;height:16px;background:var(--g3);border-radius:2px;transform:translateX(-2px)}
+
+/* berita acara keputusan */
+.report-doc{max-width:960px}
+.rd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px double var(--line);padding-bottom:14px;margin-bottom:16px}
+.rd-head small{font-weight:800;letter-spacing:.1em;color:var(--t)}
+.rd-head h2{margin:4px 0}.rd-head p{margin:0;color:var(--mut);font-size:13px}
+.rd-logo{font-size:40px}
+.report-doc h3{margin:20px 0 10px}
+.note{background:var(--txl);border-left:4px solid var(--t);padding:10px 14px;border-radius:0 12px 12px 0;margin-bottom:10px}
+tr.win-row td{background:#fffbeb}
+.rd-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:22px;border-top:1px dashed var(--line);padding-top:14px}
+.rd-foot div{display:flex;flex-direction:column}.rd-foot b{font-size:15px;margin:22px 0 2px}
+
+/* log sso */
+.checks{margin:6px 0 0;padding-left:20px;font-size:13px}
+.checks li{margin-bottom:4px}
+code.jti{font-size:11px}
+
+/* halaman masuk SSO */
+.sso-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#134e4a,#0f766e 60%,#14b8a6)}
+.sso-box{background:#fff;border-radius:24px;max-width:520px;width:100%;padding:32px;box-shadow:0 30px 60px rgba(0,0,0,.25)}
+.sso-logo{width:64px;height:64px;border-radius:18px;background:#5eead4;display:grid;place-items:center;font-size:34px;box-shadow:0 5px 0 #0d9488;margin-bottom:14px}
+.sso-box h1{font-size:26px;font-weight:800;color:#134e4a}.sso-box h1 span{color:#0d9488}
+.sso-box .lead{margin:8px 0 18px;border-color:#5eead4;background:var(--txl)}
+.sso-flow{padding-left:0;list-style:none;counter-reset:s;margin:18px 0}
+.sso-flow li{counter-increment:s;position:relative;padding:0 0 12px 40px}
+.sso-flow li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--txl);color:var(--t2);font-weight:800;display:grid;place-items:center;font-size:13px}
+.sso-flow b{display:block;font-size:14px}.sso-flow small{font-size:12px}
+.sso-page .btn{background:var(--t)}.sso-page .btn:hover{background:var(--t2)}
+
+@media (max-width:1100px){.g-side-r{grid-template-columns:1fr}}
+@media print{.dss .winner{box-shadow:none}.report-doc{max-width:none}}
+
+.crit-name{min-width:220px}
+.chip.on small{color:#fff;opacity:.85}
+.tight-grid{gap:0 16px}
+.tight-grid label{margin-top:8px}
+.kat-list.cols2{grid-template-columns:1fr 1fr;gap:8px 16px}
+.jenis-in{width:140px;padding:7px 10px;font-weight:700}
+.jenis-in.benefit{color:#15803d;background:#f0fdf4}.jenis-in.cost{color:#c2410c;background:#fff7ed}
+table.cb th{width:50%}table.cb th:first-child{color:#15803d}table.cb th:last-child{color:#c2410c}
+table.cb td{vertical-align:top;font-size:13px}table.cb td div{margin:3px 0}
+table.cb tr.f td{font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:700}
+.formula .f-box span+span{margin-top:0}
+.rk-skor{font-size:11px;font-weight:700;color:var(--mut);margin-left:6px}
+.bukti-in{min-width:230px;padding:7px 10px;font-size:13px}
+table.matrix .cell-in{width:104px;padding:7px 8px}
+table.matrix .bukti-in{min-width:200px;width:100%}
+table.matrix td:first-child{min-width:150px}
+table.matrix th,table.matrix td{padding-left:8px;padding-right:8px}

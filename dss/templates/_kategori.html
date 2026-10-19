@@ -1,0 +1,6 @@
+<div class="chips kat-chips">
+  {% for k in kats %}
+    <a class="chip {{ 'on' if kat and kat.id == k.id else '' }}" href="?kategori={{ k.id }}">{{ k.ikon }} {{ k.nama }} <small>{{ k.n_aktif or 0 }}</small></a>
+  {% endfor %}
+</div>
+{% if not kats %}<div class="card"><div class="empty"><div class="empty-ic">🗂️</div><b>Belum ada kategori</b></div></div>{% endif %}

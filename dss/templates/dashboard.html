@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% set judul = 'Dashboard DSS' %}
+{% set sub = 'Pendukung keputusan pemilihan supplier terbaik dengan metode <b>Simple Additive Weighting (SAW)</b>.' %}
+{% block isi %}
+<section class="hero-banner dss-hero">
+  <div>
+    <span class="hb-kicker">Halo, {{ user.nama.split()[0] }} · masuk lewat SSO</span>
+    <h2>Supplier mana yang paling layak dipilih? 🧭</h2>
+    <p>DSS menilai setiap supplier pada beberapa kriteria, membobotnya sesuai prioritas manajemen, lalu memberi ranking. Data kategori dan prioritas diambil langsung dari TPS MartOffice.</p>
+  </div>
+  <div class="hb-fruit" aria-hidden="true">🚚⚖️🏆</div>
+</section>
+
+<div class="kpis">
+  <a class="kpi g" href="{{ url_for('supplier') }}"><div class="kpi-top"><span class="kpi-ic">🚚</span></div><small>Supplier aktif</small><strong>{{ stat.supplier }}</strong><em>alternatif keputusan</em></a>
+  <a class="kpi b" href="{{ url_for('hitung') }}"><div class="kpi-top"><span class="kpi-ic">🗂️</span></div><small>Kategori siap dihitung</small><strong>{{ stat.kategori }}</strong><em>penilaian lengkap</em></a>
+  <a class="kpi {{ 'y' if stat.bobot > 0 else 'r' }}" href="{{ url_for('kriteria') }}"><div class="kpi-top"><span class="kpi-ic">⚖️</span></div><small>Kriteria</small><strong>{{ stat.kriteria }}</strong><em>{{ stat.benefit }} benefit · {{ stat.cost }} cost</em></a>
+  <a class="kpi p" href="{{ url_for('keputusan') }}"><div class="kpi-top"><span class="kpi-ic">🏆</span></div><small>Keputusan tersimpan</small><strong>{{ stat.keputusan }}</strong><em>riwayat manajer</em></a>
+  <a class="kpi o" href="{{ url_for('log_sso') }}"><div class="kpi-top"><span class="kpi-ic">🔐</span></div><small>Login SSO hari ini</small><strong>{{ stat.sso }}</strong><em>dari MartOffice</em></a>
+</div>
+
+<div class="card">
+  <div class="card-h"><h3>🪜 Alur Pengambilan Keputusan</h3><span class="hint">klik langkah untuk membuka</span></div>
+  <div class="steps">
+    {% for nama, selesai, href in langkah %}
+      <a class="step {{ 'done' if selesai else '' }}" href="{{ href }}"><span class="no">{{ '✓' if selesai else loop.index }}</span><b>{{ nama }}</b></a>
+      {% if not loop.last %}<span class="step-arrow">→</span>{% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<section class="card panel">
+    <div class="card-h"><h3>🏆 Juara Sementara per Kategori</h3><a class="btn sm ghost" href="{{ url_for('hitung') }}">Lihat perhitungan →</a></div>
+    {% if juara %}
+      <div class="champs">
+      {% for j in juara %}
+        <a class="champ" href="{{ url_for('hitung', kategori=j.kategori.id) }}">
+          <div class="champ-h"><span class="champ-ic">{{ j.kategori.ikon }}</span><div><b>{{ j.kategori.nama }}</b><small>{{ j.n }} supplier{% if j.kurang %} · {{ j.kurang }} belum lengkap{% endif %}</small></div></div>
+          {% if j.pertama %}
+            <div class="champ-win"><span class="medal">🥇</span><div><b>{{ j.pertama.nama }}</b><small>V = {{ j.pertama.v|angka(4) }}{% if j.kedua %} · unggul {{ (j.pertama.v - j.kedua.v)|angka(4) }} dari {{ j.kedua.nama }}{% endif %}</small></div></div>
+            <small class="champ-foot">{% if j.terakhir %}Keputusan terakhir: <b>{{ j.terakhir.pemenang_nama }}</b> · {{ j.terakhir.dibuat_pada|tgl(false) }}{% else %}Belum ada keputusan tersimpan{% endif %}</small>
+          {% else %}
+            <div class="empty sm"><p>Penilaian belum lengkap — isi dulu di menu Penilaian.</p></div>
+          {% endif %}
+        </a>
+      {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty"><div class="empty-ic">🚚</div><b>Belum ada supplier</b><p>Tambahkan supplier di menu <a href="{{ url_for('supplier') }}">Data Supplier</a>, lalu isi penilaiannya.</p></div>
+    {% endif %}
+</section>
+
+<section class="card panel">
+    <div class="card-h"><h3>🧾 Prioritas Evaluasi dari Data TPS</h3><span class="badge {{ 'g' if tps else 'r' }}">{{ 'Terhubung ke TPS' if tps else 'TPS tidak terhubung' }}</span></div>
+    {% if tps %}
+      <p class="hint mt0">Omzet 30 hari dan stok menipis per kategori diambil dari database MySQL MartOffice melalui API bertanda tangan HMAC. Urutan prioritas: kategori beromzet besar dan banyak stok menipis yang belum pernah atau sudah lama tidak dievaluasi berada paling atas.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>Kategori produk</th><th class="num">Produk</th><th class="num">Terjual (30 hari)</th><th class="num">Omzet 30 hari</th><th class="num">Stok menipis</th><th class="num">Supplier di DSS</th><th>Status evaluasi</th></tr></thead>
+        <tbody>
+        {% for p in prioritas %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td class="nowrap">{{ p.kat.ikon if p.kat else '📦' }} {% if p.kat %}<a href="{{ url_for('hitung', kategori=p.kat.id) }}"><b>{{ p.nama }}</b></a>{% else %}<b>{{ p.nama }}</b>{% endif %}</td>
+            <td class="num">{{ p.produk }}</td>
+            <td class="num">{{ p.qty|angka }}</td>
+            <td class="num"><b>{{ p.omzet|rp }}</b></td>
+            <td class="num">{% if p.menipis %}<span class="badge r">{{ p.menipis }}</span>{% else %}0{% endif %}</td>
+            <td class="num">{{ p.n_supplier }}</td>
+            <td><span class="badge {{ p.tone }}">{{ p.status }}</span></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      <p class="sumber">Sumber: <code>MartOffice · transaksi</code>, <code>detail_transaksi</code>, <code>produk</code> — diambil {{ tps.waktu|tgl }}</p>
+    {% else %}
+      <div class="empty"><div class="empty-ic">🔌</div><b>Data TPS belum dapat diambil</b><p>Pastikan Apache XAMPP menyala dan alamat MartOffice di <code>dss/config.py</code> benar.</p></div>
+    {% endif %}
+</section>
+
+<section class="card panel">
+  <div class="card-h"><h3>🗒️ Keputusan Terbaru</h3><a class="btn sm ghost" href="{{ url_for('keputusan') }}">Semua riwayat →</a></div>
+  {% if terbaru %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Tanggal</th><th>Kategori</th><th>Judul</th><th>Supplier terpilih</th><th class="num">Nilai V</th><th>Oleh</th></tr></thead>
+      <tbody>{% for p in terbaru %}
+        <tr><td class="nowrap">{{ p.dibuat_pada|tgl }}</td><td>{{ p.ikon }} {{ p.kategori }}</td><td><a href="{{ url_for('keputusan_detail', kid=p.id) }}">{{ p.judul }}</a></td>
+            <td><b>🥇 {{ p.pemenang_nama }}</b></td><td class="num">{{ p.nilai_v|angka(4) }}</td><td>{{ p.dibuat_oleh }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  {% else %}
+    <div class="empty"><div class="empty-ic">🏆</div><b>Belum ada keputusan</b><p>Manajer dapat menyimpan hasil ranking dari halaman Perhitungan SAW.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

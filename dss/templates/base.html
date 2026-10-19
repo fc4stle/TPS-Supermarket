@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ judul }} · DSS MartOffice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='dss.css') }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+</head>
+<body class="dss">
+{% set menu = [
+  ('Ringkasan', [('dashboard', '🧭', 'Dashboard DSS', url_for('dashboard'))]),
+  ('Data Keputusan', [
+    ('supplier', '🚚', 'Data Supplier', url_for('supplier')),
+    ('kriteria', '⚖️', 'Kriteria & Bobot', url_for('kriteria')),
+    ('penilaian', '📝', 'Penilaian Supplier', url_for('penilaian')),
+  ]),
+  ('Analisis SAW', [
+    ('hitung', '🧮', 'Perhitungan SAW', url_for('hitung')),
+    ('sensitivitas', '🎚️', 'Analisis Sensitivitas', url_for('sensitivitas')),
+    ('keputusan', '🏆', 'Riwayat Keputusan', url_for('keputusan')),
+  ]),
+  ('Sistem', [('log', '🔐', 'Log Single Sign-On', url_for('log_sso'))]),
+] %}
+<div class="shell">
+  <aside class="side" id="side">
+    <a class="brand" href="{{ url_for('dashboard') }}">
+      <span class="logo">🧭</span>
+      <span><b>Mart</b><i>Office</i><small>Decision Support System</small></span>
+    </a>
+    <nav class="menu">
+      {% for label, items in menu %}
+        <div class="menu-label">{{ label }}</div>
+        {% for key, ic, text, href in items %}
+          <a href="{{ href }}" class="{{ 'on' if key == active else '' }}"><span class="mi">{{ ic }}</span><span class="mt">{{ text }}</span></a>
+        {% endfor %}
+      {% endfor %}
+      <div class="menu-label">Kembali ke MartOffice</div>
+      <a href="{{ home }}/beranda.php"><span class="mi">🏠</span><span class="mt">Beranda MartOffice</span><span class="ext">↗</span></a>
+      {% if is_manajer %}<a href="{{ home }}/mis/index.php"><span class="mi">📈</span><span class="mt">MIS · Kinerja</span><span class="ext">↗</span></a>{% endif %}
+    </nav>
+    <div class="side-foot">
+      <div class="me">
+        <span class="avatar">{{ user.nama.split()[:2]|map('first')|join|upper }}</span>
+        <div><b>{{ user.nama }}</b><small>{{ user.jabatan or user.role|capitalize }}</small></div>
+      </div>
+      <div class="sso-chip" title="Sesi dibuat dari token Single Sign-On MartOffice">🔐 Masuk via SSO MartOffice</div>
+      <a class="logout" href="{{ url_for('keluar') }}">⎋ Keluar (DSS + MartOffice)</a>
+    </div>
+  </aside>
+  <div class="side-backdrop" onclick="document.body.classList.remove('menu-open')"></div>
+
+  <div class="main">
+    <div class="promo-strip dss-strip">
+      <span>🧭 Decision Support System</span><span>⚖️ Metode SAW</span><span>🔐 Single Sign-On</span><span>🐍 Flask + SQLite · port {{ port }}</span>
+    </div>
+    <header class="topbar">
+      <button class="burger" type="button" onclick="document.body.classList.toggle('menu-open')" aria-label="Menu">☰</button>
+      <div class="tb-title">
+        <h1>{{ judul }}</h1>
+        {% if sub %}<p>{{ sub|safe }}</p>{% endif %}
+      </div>
+      <div class="tb-right">
+        <span class="today">📅 {{ hari_ini }}</span>
+        <span class="role-pill {{ user.role }}">{{ user.role|capitalize }}</span>
+      </div>
+    </header>
+    <main class="content">
+      {% with msgs = get_flashed_messages(with_categories=true) %}
+        {% for kat, m in msgs %}
+          <div class="alert {{ kat }}"><div>{{ m }}</div><button class="x" type="button" onclick="this.parentNode.remove()">×</button></div>
+        {% endfor %}
+      {% endwith %}
+      {% block isi %}{% endblock %}
+    </main>
+    <footer class="foot">MartOffice DSS © {{ hari_ini[-4:] }} · TPS · OAS · KMS · MIS · DSS terintegrasi · Flask + SQLite · SSO dengan PHP + MySQL</footer>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='dss.js') }}"></script>
+{% block js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% set judul = 'Perhitungan SAW' %}
+{% set sub = 'Simple Additive Weighting langkah demi langkah: matriks keputusan → normalisasi → pembobotan → ranking.' %}
+{% block isi %}
+{% include '_kategori.html' %}
+{% if kat and h %}
+{% set K = h.kriteria %}
+{% if h.tidak_lengkap %}
+  <div class="alert info"><div><b>{{ h.tidak_lengkap|length }} supplier belum diikutkan</b> karena penilaiannya belum lengkap:
+  {% for a in h.tidak_lengkap %}{{ a.nama }} (kurang {{ a.hilang|join(', ') }}){{ ', ' if not loop.last }}{% endfor %}. <a href="{{ url_for('penilaian', kategori=kat.id) }}">Lengkapi penilaian →</a></div></div>
+{% endif %}
+{% if h.total_bobot <= 0 %}
+  <div class="alert err"><div>Total bobot kriteria masih 0. Atur bobot di <a href="{{ url_for('kriteria') }}">Kriteria & Bobot</a>.</div></div>
+{% endif %}
+
+{% if h.ranking %}
+{% set win = h.ranking[0] %}
+<section class="winner">
+  <div class="w-medal">🥇</div>
+  <div class="w-body">
+    <small>Rekomendasi supplier terbaik · {{ kat.ikon }} {{ kat.nama }}</small>
+    <h2>{{ win.nama }}</h2>
+    <p>Nilai preferensi <b>V = {{ win.v|angka(4) }}</b> (skor {{ (win.v * 100)|angka(2) }} dari 100){% if h.ranking|length > 1 %}, unggul <b>{{ (win.v - h.ranking[1].v)|angka(4) }}</b> poin dari {{ h.ranking[1].nama }}{% endif %} — dari {{ h.ranking|length }} supplier yang dinilai pada {{ K|length }} kriteria.</p>
+  </div>
+  <a class="btn y" href="#simpan">🏆 Simpan sebagai keputusan</a>
+</section>
+
+<section class="card tight">
+  <div class="card-h"><h3><span class="stepno">1</span> Matriks Keputusan (X)</h3><span class="hint">nilai asli dari menu Penilaian</span></div>
+  <div class="table-wrap"><table class="matrix">
+    <thead><tr><th>Alternatif</th>{% for k in K %}<th class="num">{{ k.kode }}<small class="block">{{ k.nama }}</small><span class="badge {{ '' if k.jenis == 'benefit' else 'o' }}">{{ '▲' if k.jenis == 'benefit' else '▼' }} {{ k.jenis }}</span></th>{% endfor %}</tr></thead>
+    <tbody>{% for a in h.alternatif %}<tr><td><b>{{ a.kode }}</b> {{ a.nama }}{% if a.bukti %}<small class="block">📎 {{ a.bukti }}</small>{% endif %}</td>{% for k in K %}<td class="num">{{ h.X[a.id][k.id]|nilai }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    <tfoot><tr><th>Max / Min</th>{% for k in K %}<th class="num">{{ 'max' if k.jenis == 'benefit' else 'min' }} = {{ h.pembagi[k.id]|nilai }}</th>{% endfor %}</tr></tfoot>
+  </table></div>
+</section>
+
+<section class="card tight">
+  <div class="card-h"><h3><span class="stepno">2</span> Matriks Ternormalisasi (R)</h3><span class="hint">benefit: x / max · cost: min / x</span></div>
+  <div class="table-wrap"><table class="matrix">
+    <thead><tr><th>Alternatif</th>{% for k in K %}<th class="num">{{ k.kode }}<small class="block">{{ 'x / ' ~ (h.pembagi[k.id]|nilai) if k.jenis == 'benefit' else (h.pembagi[k.id]|nilai) ~ ' / x' }}</small></th>{% endfor %}</tr></thead>
+    <tbody>{% for a in h.alternatif %}<tr><td><b>{{ a.kode }}</b> {{ a.nama }}</td>
+      {% for k in K %}{% set r = h.R[a.id][k.id] %}<td class="num {{ 'best' if r|round(6) == 1 else '' }}" title="{{ (h.X[a.id][k.id]|nilai ~ ' / ' ~ h.pembagi[k.id]|nilai) if k.jenis == 'benefit' else (h.pembagi[k.id]|nilai ~ ' / ' ~ h.X[a.id][k.id]|nilai) }}">{{ r|angka(4) }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+  </table></div>
+  <p class="hint pad">Sel hijau = nilai terbaik pada kriteria tersebut (r = 1).</p>
+</section>
+
+<div class="grid g-23">
+  <section class="card tight">
+    <div class="card-h"><h3><span class="stepno">3</span> Nilai Terbobot (w × r)</h3></div>
+    <div class="table-wrap"><table class="matrix">
+      <thead><tr><th>Alternatif</th>{% for k in K %}<th class="num">{{ k.kode }}<small class="block">w = {{ h.w[k.id]|angka(2) }}</small></th>{% endfor %}<th class="num">V = Σ</th></tr></thead>
+      <tbody>{% for a in h.alternatif %}<tr><td><b>{{ a.kode }}</b></td>{% for k in K %}<td class="num">{{ h.WR[a.id][k.id]|angka(4) }}</td>{% endfor %}<td class="num"><b>{{ h.V[a.id]|angka(4) }}</b></td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  <section class="card">
+    <div class="card-h"><h3>⚖️ Bobot yang Dipakai</h3><a class="btn sm ghost" href="{{ url_for('kriteria') }}">Ubah</a></div>
+    {% for k in K %}
+      <div class="hbar"><span class="hl">{{ k.kode }} {{ k.nama }}</span><span class="ht"><i style="width:{{ h.w[k.id] * 100 }}%"></i></span><span class="hv">{{ h.bobot[k.id]|nilai }} → w {{ h.w[k.id]|angka(2) }}</span></div>
+    {% endfor %}
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-h"><h3><span class="stepno">4</span> Nilai Preferensi (V) & Ranking</h3><span class="hint">V<sub>i</sub> = Σ w<sub>j</sub> · r<sub>ij</sub> · skor = 100 × V</span></div>
+  <div class="ranking">
+  {% for r in h.ranking %}
+    <div class="rk {{ 'top' if r.rank == 1 else '' }}">
+      <span class="rk-no">{{ ['🥇','🥈','🥉'][r.rank-1] if r.rank <= 3 else r.rank }}</span>
+      <div class="rk-body">
+        <div class="rk-head"><b>{{ r.nama }}</b><span class="rk-v">{{ r.v|angka(4) }}<span class="rk-skor">skor {{ (r.v * 100)|angka(2) }}</span></span></div>
+        <div class="rk-bar"><i style="width:{{ (r.v / win.v * 100) if win.v else 0 }}%"></i></div>
+        <small class="rk-f">V = {% for k in K %}{{ h.w[k.id]|angka(2) }}×{{ h.R[r.id][k.id]|angka(3) }}{{ ' + ' if not loop.last }}{% endfor %} = <b>{{ r.v|angka(4) }}</b></small>
+      </div>
+    </div>
+  {% endfor %}
+  </div>
+</section>
+
+<section class="card" id="simpan">
+  <div class="card-h"><h3>🏆 Simpan Keputusan</h3></div>
+  {% if is_manajer %}
+  <form method="post" class="grid g2">
+    <input type="hidden" name="_token" value="{{ csrf }}">
+    <div><label for="judul">Judul keputusan</label><input id="judul" name="judul" value="Pemilihan supplier {{ kat.nama }} — {{ hari_ini }}" maxlength="150"></div>
+    <div><label for="catatan">Catatan manajer</label><input id="catatan" name="catatan" placeholder="cth. Kontrak 3 bulan dengan {{ win.nama }}, evaluasi ulang Januari"></div>
+    <div class="span2 form-actions"><button>Simpan keputusan: {{ win.nama }}</button><span class="hint">Bobot dan ranking saat ini disimpan sebagai snapshot di Riwayat Keputusan.</span></div>
+  </form>
+  {% else %}
+    <p class="hint mt0">Hanya manajer yang dapat menyimpan keputusan. Anda dapat melihat perhitungan dan analisis sensitivitas.</p>
+  {% endif %}
+</section>
+{% else %}
+  <div class="card"><div class="empty"><div class="empty-ic">🧮</div><b>Belum ada supplier dengan penilaian lengkap</b><p>Isi nilai semua kriteria di menu <a href="{{ url_for('penilaian', kategori=kat.id) }}">Penilaian</a>, lalu kembali ke sini.</p></div></div>
+{% endif %}
+{% endif %}
+{% endblock %}

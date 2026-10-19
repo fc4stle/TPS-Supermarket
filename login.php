@@ -44,6 +44,7 @@ unset($_SESSION['last_user']);
       <div><span>🧾</span><p class="mb0"><b>TPS — Transaction Processing</b><small>Kasir, nota, stok, dan laporan penjualan</small></p></div>
       <div><span>📋</span><p class="mb0"><b>OAS — Office Automation</b><small>Tugas, pengumuman, agenda, dokumen, pesan</small></p></div>
       <div><span>📚</span><p class="mb0"><b>KMS — Knowledge Management</b><small>SOP &amp; panduan dengan review dan riwayat versi</small></p></div>
+      <div><span>📈</span><p class="mb0"><b>MIS &amp; DSS — Manajemen</b><small>Kinerja perusahaan &amp; pemilihan supplier (SAW, via SSO)</small></p></div>
     </div>
   </section>
 

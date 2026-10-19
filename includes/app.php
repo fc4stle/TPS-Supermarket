@@ -6,6 +6,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/layout.php';
 require_once __DIR__ . '/mis.php';
+require_once __DIR__ . '/sso.php';
 
 /* ---- Hitung URL dasar aplikasi secara otomatis ----
  * Contoh: C:\xampp\htdocs\martoffice\admin\dashboard.php diakses via

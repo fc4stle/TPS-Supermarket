@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% set judul = 'Analisis Sensitivitas' %}
+{% set sub = 'Apa yang terjadi pada ranking bila prioritas (bobot) diubah? Simulasi <i>what-if</i> tanpa mengubah data asli.' %}
+{% block isi %}
+{% include '_kategori.html' %}
+{% if kat and data %}
+<div class="grid g-side-r">
+  <section class="card">
+    <div class="card-h"><h3>🎚️ Simulasi Bobot</h3><div class="actions">
+      <button type="button" class="sm ghost" data-preset="harga">💸 Fokus harga</button>
+      <button type="button" class="sm ghost" data-preset="kualitas">⭐ Fokus kualitas</button>
+      <button type="button" class="sm ghost" data-preset="rata">⚖️ Seimbang</button>
+      <button type="button" class="sm" data-preset="reset">↺ Bobot asli</button>
+    </div></div>
+    <div id="sliders"></div>
+    <p class="hint">Total bobot simulasi: <b id="simTotal">100%</b> — perhitungan memakai bobot yang dinormalisasi (w = bobot / total), jadi total tidak harus 100%.</p>
+  </section>
+  <section class="card">
+    <div class="card-h"><h3>📊 Ranking Simulasi</h3><span class="badge" id="simStatus">Sama dengan bobot asli</span></div>
+    <div id="simRank" class="ranking"></div>
+  </section>
+</div>
+
+<section class="card tight">
+  <div class="card-h"><h3>🛡️ Rentang Aman Setiap Kriteria</h3><span class="hint">juara saat ini: <b>{{ awal.nama }}</b></span></div>
+  <p class="hint pad mt0">Bobot satu kriteria digeser 0–100% (kriteria lain menyesuaikan secara proporsional). Selama bobot berada di dalam rentang aman, <b>{{ awal.nama }}</b> tetap menjadi juara.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Kriteria</th><th class="num">Bobot saat ini</th><th>Rentang aman</th><th>Bila −10 poin</th><th>Bila +10 poin</th><th>Kesimpulan</th></tr></thead>
+    <tbody>
+    {% for t in tabel %}
+      <tr>
+        <td><code>{{ t.kriteria.kode }}</code> {{ t.kriteria.nama }}</td>
+        <td class="num">{{ t.bobot|nilai }}%</td>
+        <td><div class="range"><i style="left:{{ t.aman_min }}%;width:{{ t.aman_max - t.aman_min }}%"></i><b style="left:{{ t.bobot }}%"></b></div><small>{{ t.aman_min }}% – {{ t.aman_max }}%</small></td>
+        <td>{{ t.turun }}% → {{ '✅' if t.juara_turun.id == awal.id else '⚠️' }} {{ t.juara_turun.nama }}</td>
+        <td>{{ t.naik }}% → {{ '✅' if t.juara_naik.id == awal.id else '⚠️' }} {{ t.juara_naik.nama }}</td>
+        <td>{% if t.stabil %}<span class="badge">Stabil</span>{% else %}<span class="badge y">Sensitif</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% set sensitif = tabel|rejectattr('stabil')|list %}
+  <p class="pad">{% if sensitif %}⚠️ Keputusan <b>sensitif</b> terhadap {{ sensitif|map(attribute='kriteria.nama')|join(', ') }}: perubahan bobot ±10 poin dapat mengganti juara. Pastikan bobot benar-benar mencerminkan prioritas manajemen.{% else %}✅ Keputusan <b>stabil</b>: perubahan bobot ±10 poin pada kriteria mana pun tidak mengubah juara.{% endif %}</p>
+</section>
+<script id="sim-data" type="application/json">{{ data|tojson }}</script>
+{% elif kat %}
+  <div class="card"><div class="empty"><div class="empty-ic">🎚️</div><b>Belum ada supplier dengan penilaian lengkap</b><p>Lengkapi <a href="{{ url_for('penilaian', kategori=kat.id) }}">penilaian</a> terlebih dahulu.</p></div></div>
+{% endif %}
+{% endblock %}
+{% block js %}{% if data %}<script>dssSimulasi(JSON.parse(document.getElementById('sim-data').textContent));</script>{% endif %}{% endblock %}

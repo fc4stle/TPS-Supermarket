@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% set judul = 'Riwayat Keputusan' %}
+{% set sub = 'Arsip keputusan pemilihan supplier yang disimpan manajer, lengkap dengan snapshot bobot dan ranking.' %}
+{% block isi %}
+<div class="chips kat-chips">
+  <a class="chip {{ 'on' if not kid else '' }}" href="{{ url_for('keputusan') }}">Semua</a>
+  {% for k in kats %}<a class="chip {{ 'on' if kid == k.id else '' }}" href="{{ url_for('keputusan', kategori=k.id) }}">{{ k.ikon }} {{ k.nama }}</a>{% endfor %}
+</div>
+<section class="card tight">
+  <div class="card-h"><h3>🏆 Keputusan <span class="badge n">{{ rows|length }}</span></h3></div>
+  {% if rows %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tanggal</th><th>Kategori</th><th>Judul & catatan</th><th>Supplier terpilih</th><th class="num">Nilai V</th><th>Oleh</th><th></th></tr></thead>
+    <tbody>{% for p in rows %}
+      <tr>
+        <td class="nowrap">{{ p.dibuat_pada|tgl }}</td>
+        <td class="nowrap">{{ p.ikon }} {{ p.kategori }}</td>
+        <td><a href="{{ url_for('keputusan_detail', kid=p.id) }}"><b>{{ p.judul }}</b></a>{% if p.catatan %}<small class="block">{{ p.catatan }}</small>{% endif %}</td>
+        <td><b>🥇 {{ p.pemenang_nama }}</b></td>
+        <td class="num">{{ p.nilai_v|angka(4) }}</td>
+        <td>{{ p.dibuat_oleh }}</td>
+        <td class="right nowrap"><a class="btn sm ghost" href="{{ url_for('keputusan_detail', kid=p.id) }}">Detail</a> <a class="btn sm ghost" href="{{ url_for('keputusan_csv', kid=p.id) }}">CSV</a></td>
+      </tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}
+    <div class="empty"><div class="empty-ic">🏆</div><b>Belum ada keputusan</b><p>Simpan hasil dari halaman <a href="{{ url_for('hitung') }}">Perhitungan SAW</a>.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

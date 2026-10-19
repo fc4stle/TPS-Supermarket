@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% set judul = 'Log Single Sign-On' %}
+{% set sub = 'Jejak setiap token SSO dari MartOffice: diterima, ditolak (palsu / kedaluwarsa / dipakai ulang / role), dan logout.' %}
+{% block isi %}
+<div class="kpis">
+  <div class="kpi g"><div class="kpi-top"><span class="kpi-ic">✅</span></div><small>Token diterima</small><strong>{{ rekap.get('berhasil', 0) }}</strong><em>sesi DSS dibuat</em></div>
+  <div class="kpi r"><div class="kpi-top"><span class="kpi-ic">⛔</span></div><small>Token ditolak</small><strong>{{ rekap.get('ditolak', 0) }}</strong><em>diblokir oleh verifikasi</em></div>
+  <div class="kpi b"><div class="kpi-top"><span class="kpi-ic">⎋</span></div><small>Logout</small><strong>{{ rekap.get('keluar', 0) }}</strong><em>single sign-out</em></div>
+  <div class="kpi p"><div class="kpi-top"><span class="kpi-ic">👥</span></div><small>Pengguna tersinkron</small><strong>{{ pengguna|length }}</strong><em>dari tabel pegawai MartOffice</em></div>
+</div>
+
+<div class="grid g2">
+  <section class="card">
+    <div class="card-h"><h3>👥 Pengguna DSS</h3></div>
+    <p class="hint mt0">DSS tidak menyimpan password. Akun dibuat otomatis saat pertama kali masuk lewat SSO (<i>Just-In-Time provisioning</i>).</p>
+    {% for u in pengguna %}
+      <div class="rank"><span class="no">{{ u.nama.split()[:2]|map('first')|join|upper }}</span><div class="rb"><b>{{ u.nama }}</b><small>{{ u.role }} · {{ u.jumlah_masuk }}× masuk · terakhir {{ u.terakhir_masuk|tgl }}</small></div></div>
+    {% else %}
+      <div class="empty"><p>Belum ada pengguna.</p></div>
+    {% endfor %}
+  </section>
+  <section class="card">
+    <div class="card-h"><h3>🛡️ Pemeriksaan Token oleh DSS</h3></div>
+    <ol class="checks">
+      <li><b>Tanda tangan HMAC-SHA256</b> cocok dengan kunci bersama (SSO_SECRET) — token palsu atau diubah ditolak</li>
+      <li><b>Masa berlaku</b> belum lewat (token hanya berlaku 60 detik)</li>
+      <li><b>ID token (jti)</b> belum pernah dipakai — mencegah serangan replay</li>
+      <li><b>Role</b> termasuk manajer atau admin — staff ditolak</li>
+    </ol>
+    <p class="hint">Setiap hasil pemeriksaan, berhasil maupun ditolak, dicatat pada tabel <code>sso_log</code> di database SQLite DSS.</p>
+  </section>
+</div>
+
+  <section class="card tight">
+    <div class="card-h"><h3>🔐 Aktivitas SSO</h3>
+      <div class="chips">
+        <a class="chip {{ 'on' if not status else '' }}" href="{{ url_for('log_sso') }}">Semua</a>
+        <a class="chip {{ 'on' if status == 'berhasil' else '' }}" href="{{ url_for('log_sso', status='berhasil') }}">Berhasil</a>
+        <a class="chip {{ 'on' if status == 'ditolak' else '' }}" href="{{ url_for('log_sso', status='ditolak') }}">Ditolak</a>
+        <a class="chip {{ 'on' if status == 'keluar' else '' }}" href="{{ url_for('log_sso', status='keluar') }}">Logout</a>
+      </div>
+    </div>
+    {% if rows %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Waktu</th><th>Pengguna</th><th>Status</th><th>Keterangan</th><th>ID token (jti)</th></tr></thead>
+      <tbody>{% for r in rows %}
+        <tr>
+          <td class="nowrap">{{ r.waktu|tgl }}<small class="block">{{ r.waktu[11:19] }}</small></td>
+          <td>{% if r.nama %}<b>{{ r.nama }}</b><small class="block">{{ r.username }} · {{ r.role }}</small>{% else %}<span class="muted">tidak dikenal</span>{% endif %}</td>
+          <td>{% if r.status == 'berhasil' %}<span class="badge">✅ berhasil</span>{% elif r.status == 'ditolak' %}<span class="badge r">⛔ ditolak</span>{% else %}<span class="badge b">⎋ logout</span>{% endif %}</td>
+          <td>{{ r.alasan or 'Token sah, sesi dibuat' }}</td>
+          <td><code class="jti">{{ (r.jti or '–')[:12] }}{{ '…' if r.jti and r.jti|length > 12 }}</code></td>
+        </tr>
+      {% endfor %}</tbody>
+    </table></div>
+    {% else %}
+      <div class="empty"><div class="empty-ic">🔐</div><b>Belum ada aktivitas</b></div>
+    {% endif %}
+  </section>
+{% endblock %}

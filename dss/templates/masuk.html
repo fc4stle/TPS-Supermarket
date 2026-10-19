@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Masuk · DSS MartOffice</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='dss.css') }}">
+</head>
+<body class="dss sso-page">
+  <div class="sso-box">
+    <div class="sso-logo">🧭</div>
+    <h1>DSS <span>MartOffice</span></h1>
+    <p class="lead">Decision Support System pemilihan supplier terbaik (metode SAW)</p>
+
+    {% if alasan %}
+      <div class="alert err"><div><b>Akses ditolak.</b><br>{{ alasan }}</div></div>
+      <p class="hint">Percobaan ini sudah dicatat di Log SSO. Silakan masuk kembali melalui MartOffice.</p>
+    {% else %}
+      <div class="alert info"><div>DSS tidak memiliki halaman login sendiri. Masuk dilakukan sekali di <b>MartOffice</b>, lalu Anda otomatis masuk ke DSS melalui <b>Single Sign-On</b>.</div></div>
+    {% endif %}
+
+    <ol class="sso-flow">
+      <li><b>Login di MartOffice</b><small>username & password diperiksa oleh PHP + MySQL</small></li>
+      <li><b>Klik kartu DSS di Beranda</b><small>PHP membuat token bertanda tangan HMAC-SHA256 (berlaku 60 detik)</small></li>
+      <li><b>DSS memverifikasi token</b><small>Flask memeriksa tanda tangan, masa berlaku, role, dan pemakaian ulang</small></li>
+      <li><b>Sesi DSS dibuat</b><small>tanpa perlu memasukkan password lagi</small></li>
+    </ol>
+
+    <a class="btn block" href="{{ home }}/sso_dss.php">🔐 Masuk lewat MartOffice</a>
+    <p class="hint center">Hanya role <b>manajer</b> dan <b>admin</b> yang dapat membuka DSS · port {{ port }}</p>
+  </div>
+</body>
+</html>

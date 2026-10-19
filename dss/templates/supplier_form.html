@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% set judul = 'Ubah Supplier' %}
+{% set sub = s.kode ~ ' · ' ~ s.nama %}
+{% block isi %}
+<section class="card narrow">
+  <div class="card-h"><h3>✏️ Ubah Data Supplier</h3><a class="btn sm ghost" href="{{ url_for('supplier') }}">← Kembali</a></div>
+  <form method="post">
+    <input type="hidden" name="_token" value="{{ csrf }}">
+    <div class="grid g2">
+      <div><label for="kode">Kode</label><input id="kode" name="kode" value="{{ s.kode }}"></div>
+      <div><label for="kategori_id">Kategori *</label>
+        <select id="kategori_id" name="kategori_id" required>
+          {% for k in kategori %}<option value="{{ k.id }}" {{ 'selected' if (s.kategori_id|string) == (k.id|string) else '' }}>{{ k.ikon }} {{ k.nama }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <label for="nama">Nama supplier *</label><input id="nama" name="nama" value="{{ s.nama }}" required minlength="3">
+    <div class="grid g2">
+      <div><label for="kontak">Nama kontak</label><input id="kontak" name="kontak" value="{{ s.kontak or '' }}"></div>
+      <div><label for="telepon">Telepon</label><input id="telepon" name="telepon" value="{{ s.telepon or '' }}"></div>
+    </div>
+    <label for="alamat">Alamat</label><input id="alamat" name="alamat" value="{{ s.alamat or '' }}">
+    <p class="hint">Memindahkan supplier ke kategori lain membuatnya dibandingkan dengan supplier di kategori tersebut.</p>
+    <div class="form-actions"><button>Simpan Perubahan</button></div>
+  </form>
+</section>
+{% endblock %}

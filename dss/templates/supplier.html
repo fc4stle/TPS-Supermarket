@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% set judul = 'Data Supplier' %}
+{% set sub = 'Alternatif keputusan — setiap supplier dikelompokkan sesuai kategori produk TPS MartOffice.' %}
+{% block isi %}
+<div class="grid g-23">
+<section class="card">
+      <div class="card-h"><h3>➕ Tambah Supplier</h3></div>
+      <form method="post">
+        <input type="hidden" name="_token" value="{{ csrf }}">
+        <div class="grid g3 tight-grid">
+        <div><label for="nama">Nama supplier *</label>
+        <input id="nama" name="nama" value="{{ form.nama }}" required minlength="3" placeholder="cth. CV Tani Makmur"></div>
+        <div><label for="kategori_id">Kategori *</label>
+        <select id="kategori_id" name="kategori_id" required>
+          <option value="">— pilih kategori —</option>
+          {% for k in kategori %}<option value="{{ k.id }}" {{ 'selected' if (form.kategori_id|string) == (k.id|string) or (not form and kid == k.id) else '' }}>{{ k.ikon }} {{ k.nama }}</option>{% endfor %}
+        </select></div>
+        <div><label for="kode">Kode</label>
+        <input id="kode" name="kode" value="{{ form.kode }}" placeholder="kosongkan → otomatis SUP-xxx"></div>
+        <div><label for="kontak">Nama kontak</label>
+        <input id="kontak" name="kontak" value="{{ form.kontak }}"></div>
+        <div><label for="telepon">Telepon</label>
+        <input id="telepon" name="telepon" value="{{ form.telepon }}" inputmode="tel"></div>
+        <div><label for="alamat">Alamat</label>
+        <input id="alamat" name="alamat" value="{{ form.alamat }}"></div>
+        </div>
+        <div class="form-actions"><button>Simpan Supplier</button><span class="hint">Setelah disimpan, isi nilainya di menu Penilaian Supplier.</span></div>
+      </form>
+    </section>
+<section class="card">
+      <div class="card-h"><h3>🔄 Kategori dari TPS</h3></div>
+      <p class="hint mt0">Kategori supplier mengikuti kategori produk di TPS MartOffice, sehingga hasil DSS dapat dikaitkan dengan data penjualan.</p>
+      <form method="post"><input type="hidden" name="_token" value="{{ csrf }}"><input type="hidden" name="aksi" value="sinkron">
+        <button class="ghost block">Sinkronkan kategori dari TPS</button></form>
+      <ul class="kat-list cols2">{% for k in kategori %}<li>{{ k.ikon }} {{ k.nama }} <span class="badge {{ 'b' if k.sumber == 'tps' else 'n' }}">{{ 'TPS' if k.sumber == 'tps' else 'lokal' }}</span></li>{% endfor %}</ul>
+    </section>
+</div>
+
+  <section class="card tight">
+    <div class="card-h">
+      <h3>🚚 Daftar Supplier <span class="badge n">{{ suppliers|length }}</span></h3>
+      <form method="get" class="inline"><input type="hidden" name="kategori" value="{{ kid or '' }}"><input name="q" value="{{ cari }}" placeholder="Cari nama / kode / kontak…"><button class="sm">Cari</button></form>
+    </div>
+    <div class="chips pad">
+      <a class="chip {{ 'on' if not kid else '' }}" href="{{ url_for('supplier', q=cari or None) }}">Semua</a>
+      {% for k in kategori %}<a class="chip {{ 'on' if kid == k.id else '' }}" href="{{ url_for('supplier', kategori=k.id, q=cari or None) }}">{{ k.ikon }} {{ k.nama }} <small>{{ k.n_supplier }}</small></a>{% endfor %}
+    </div>
+    {% if suppliers %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Supplier</th><th>Kategori</th><th>Kontak</th><th>Penilaian</th><th>Status</th><th class="right">Aksi</th></tr></thead>
+      <tbody>
+      {% for s in suppliers %}
+        <tr class="{{ '' if s.aktif else 'muted-row' }}">
+          <td><b>{{ s.nama }}</b><small class="block"><code>{{ s.kode }}</code>{% if s.alamat %} · {{ s.alamat }}{% endif %}</small></td>
+          <td class="nowrap">{{ s.ikon }} {{ s.kategori }}</td>
+          <td class="nowrap">{{ s.kontak or '–' }}{% if s.telepon %}<small class="block">{{ s.telepon }}</small>{% endif %}</td>
+          <td>
+            {% set pct = (s.n_nilai / n_krit * 100) if n_krit else 0 %}
+            <div class="meter"><i style="width:{{ pct }}%" class="{{ 'full' if s.n_nilai >= n_krit else '' }}"></i></div>
+            <small><a href="{{ url_for('penilaian', kategori=s.kategori_id) }}">{{ s.n_nilai }}/{{ n_krit }} kriteria</a></small>
+          </td>
+          <td>{% if s.aktif %}<span class="badge">Aktif</span>{% else %}<span class="badge n">Nonaktif</span>{% endif %}</td>
+          <td class="right nowrap">
+            <a class="btn sm ghost" href="{{ url_for('supplier_ubah', sid=s.id) }}">✏️</a>
+            <form method="post" action="{{ url_for('supplier_aksi', sid=s.id) }}" class="inline">
+              <input type="hidden" name="_token" value="{{ csrf }}"><input type="hidden" name="aksi" value="status">
+              <button class="sm ghost" title="{{ 'Nonaktifkan' if s.aktif else 'Aktifkan' }}">{{ '⏸️' if s.aktif else '▶️' }}</button>
+            </form>
+            {% if is_manajer %}
+            <form method="post" action="{{ url_for('supplier_aksi', sid=s.id) }}" class="inline" data-confirm="Hapus {{ s.nama }} beserta semua nilainya?">
+              <input type="hidden" name="_token" value="{{ csrf }}"><input type="hidden" name="aksi" value="hapus">
+              <button class="sm ghost" title="Hapus">🗑️</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}
+      <div class="empty"><div class="empty-ic">🚚</div><b>Belum ada supplier{{ ' yang cocok' if cari or kid else '' }}</b><p>Tambahkan supplier lewat formulir di atas.</p></div>
+    {% endif %}
+  </section>
+{% endblock %}

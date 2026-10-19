@@ -64,6 +64,7 @@ echo hero('Selamat bekerja, ' . e(explode(' ', me()['nama'])[0]) . '! 🌿', 'Pa
 <h3 class="section-title">⚡ Akses Cepat</h3>
 <div class="quicks">
   <?= quick('📈', 'MIS · Kinerja Perusahaan', 'Dashboard eksekutif dari TPS, OAS, KMS', 'mis/index.php', 'p') ?>
+  <?= quick('🧭', 'DSS · Pemilihan Supplier', 'Ranking supplier metode SAW (SSO)', 'sso_dss.php', 't') ?>
   <?= quick('📊', 'Laporan TPS', 'Penjualan, produk, dan kasir', 'tps/laporan.php', 'y') ?>
   <?= quick('📋', 'OAS', 'Tugas dan pengumuman internal', 'oas/tugas.php', 'b') ?>
   <?= quick('📚', 'Knowledge Center', 'Akses pengetahuan organisasi', 'kms/index.php', 'g') ?>

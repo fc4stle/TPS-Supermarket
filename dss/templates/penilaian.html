@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% set judul = 'Penilaian Supplier' %}
+{% set sub = 'Matriks keputusan X — gunakan data penawaran pada periode yang sama dan catat sumber bukti untuk setiap supplier.' %}
+{% block isi %}
+{% include '_kategori.html' %}
+{% if kat %}
+<section class="card tight">
+  <div class="card-h"><h3>📝 Matriks Penilaian · {{ kat.ikon }} {{ kat.nama }}</h3><a class="btn sm ghost" href="{{ url_for('hitung', kategori=kat.id) }}">Hitung SAW →</a></div>
+  {% if sups %}
+  <p class="hint pad mt0">📌 Gunakan data penawaran pada <b>periode yang sama</b> untuk semua supplier agar perbandingan adil, dan catat <b>sumber bukti</b> (surat penawaran, hasil uji sampel, catatan pengiriman) untuk setiap supplier.</p>
+  <form method="post">
+    <input type="hidden" name="_token" value="{{ csrf }}">
+    <div class="table-wrap"><table class="matrix">
+      <thead>
+        <tr><th>Supplier</th>{% for k in kriteria %}<th class="num">{{ k.kode }}<small class="block">{{ k.nama }}</small><span class="badge {{ '' if k.jenis == 'benefit' else 'o' }}">{{ '▲' if k.jenis == 'benefit' else '▼' }} {{ k.jenis }}</span><small class="block">{{ k.satuan or '' }}</small></th>{% endfor %}<th style="min-width:240px">Sumber bukti</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+      {% for s in sups %}
+        {% set ns = namespace(n=0) %}
+        <tr>
+          <td><b>{{ s.nama }}</b><small class="block"><code>{{ s.kode }}</code></small></td>
+          {% for k in kriteria %}
+            {% set v = nilai.get((s.id, k.id)) %}{% if v %}{% set ns.n = ns.n + 1 %}{% endif %}
+            <td class="num"><input type="number" step="any" min="0.0001" name="n_{{ s.id }}_{{ k.id }}" value="{{ v|mentah if v else '' }}" class="cell-in" aria-label="{{ s.nama }} {{ k.nama }}"></td>
+          {% endfor %}
+          <td><input name="bukti_{{ s.id }}" value="{{ s.bukti or '' }}" maxlength="300" class="bukti-in" placeholder="cth. Surat penawaran No…, uji sampel QC" aria-label="Sumber bukti {{ s.nama }}">{% if s.bukti_diubah %}<small class="block">diperbarui {{ s.bukti_diubah|tgl }}</small>{% endif %}</td>
+          <td>{% if ns.n == kriteria|length %}<span class="badge">Lengkap</span>{% else %}<span class="badge y">{{ ns.n }}/{{ kriteria|length }}</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <div class="form-actions pad"><button>💾 Simpan Penilaian</button><span class="hint">Kosongkan sel untuk menghapus nilai. Supplier yang belum lengkap tidak diikutkan dalam perhitungan. Sumber bukti ikut tersimpan pada berita acara keputusan.</span></div>
+  </form>
+  {% else %}
+    <div class="empty"><div class="empty-ic">🚚</div><b>Belum ada supplier aktif di kategori ini</b><p><a href="{{ url_for('supplier', kategori=kat.id) }}">Tambahkan supplier</a> terlebih dahulu.</p></div>
+  {% endif %}
+</section>
+<section class="card">
+  <div class="card-h"><h3>📏 Panduan Pengisian</h3></div>
+  <div class="guide">{% for k in kriteria %}<div><code>{{ k.kode }}</code> <b>{{ k.nama }}</b> <span class="badge {{ '' if k.jenis == 'benefit' else 'o' }}">{{ k.jenis }}</span><small class="block">{{ k.keterangan or '' }} {% if k.satuan %}Satuan: {{ k.satuan }}.{% endif %}</small></div>{% endfor %}</div>
+</section>
+{% endif %}
+{% endblock %}

@@ -29,6 +29,7 @@ function mis_menu(): array
             ['mis-pegawai', '🏅', 'Kinerja Pegawai', 'mis/pegawai.php', [], 0],
             ['mis-perkiraan', '🔮', 'Perkiraan', 'mis/perkiraan.php', [], 0],
             ['mis-laporan', '🗒️', 'Laporan Manajemen', 'mis/laporan.php', [], 0],
+            ['dss', '🧭', 'DSS · Pemilihan Supplier ↗', 'sso_dss.php', [], 0],
         ]],
         ['Operasional', [
             ['beranda', '🏠', 'Beranda', 'beranda.php', [], 0],

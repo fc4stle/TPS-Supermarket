@@ -1,3 +1,11 @@
 .DS_Store
 Thumbs.db
 *.log
+# DSS: database & kunci sesi dibuat otomatis saat dijalankan
+dss/dss.db
+dss/.secret_key
+__pycache__/
+*.pyc
+uploads/dokumen/*
+!uploads/dokumen/index.php
+!uploads/dokumen/sim_*.pdf

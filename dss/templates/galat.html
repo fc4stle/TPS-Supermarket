@@ -1,0 +1,4 @@
+{% extends 'base.html' if user else 'galat_polos.html' %}
+{% block isi %}
+<div class="card"><div class="empty"><div class="empty-ic">🧭</div><b>{{ kode }} — {{ judul }}</b><p>Halaman yang Anda cari tidak tersedia. <a href="{{ url_for('dashboard') }}">Kembali ke Dashboard DSS</a></p></div></div>
+{% endblock %}

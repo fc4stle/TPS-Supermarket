@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% set judul = 'Detail Keputusan' %}
+{% set sub = p.ikon ~ ' ' ~ p.kategori ~ ' · disimpan ' ~ (p.dibuat_pada|tgl) ~ ' oleh ' ~ p.dibuat_oleh %}
+{% block isi %}
+<div class="actions no-print" style="margin-bottom:16px">
+  <a class="btn ghost" href="{{ url_for('keputusan') }}">← Riwayat</a>
+  <button type="button" onclick="window.print()">🖨️ Cetak</button>
+  <a class="btn ghost" href="{{ url_for('keputusan_csv', kid=p.id) }}">⬇️ Ekspor CSV</a>
+  {% if is_manajer %}<form method="post" action="{{ url_for('keputusan_hapus', kid=p.id) }}" class="inline" data-confirm="Hapus riwayat keputusan ini?"><input type="hidden" name="_token" value="{{ csrf }}"><button class="ghost">🗑️ Hapus</button></form>{% endif %}
+</div>
+<article class="card report-doc">
+  <header class="rd-head">
+    <div><small>BERITA ACARA KEPUTUSAN · DSS MARTOFFICE</small><h2>{{ p.judul }}</h2><p>No. DSS-{{ '%04d' % p.id }} · Kategori {{ p.kategori }} · Metode Simple Additive Weighting</p></div>
+    <span class="rd-logo">🧭</span>
+  </header>
+  <section class="winner sm">
+    <div class="w-medal">🥇</div>
+    <div class="w-body"><small>Supplier terpilih</small><h2>{{ p.pemenang_nama }}</h2><p>Nilai preferensi V = <b>{{ p.nilai_v|angka(4) }}</b></p></div>
+  </section>
+  {% if p.catatan %}<div class="note"><b>Catatan manajer:</b> {{ p.catatan }}</div>{% endif %}
+
+  <h3>Kriteria dan bobot</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Kode</th><th>Kriteria</th><th>Jenis</th><th class="num">Bobot</th></tr></thead>
+    <tbody>{% for b in bobot %}<tr><td><code>{{ b.kode }}</code></td><td>{{ b.nama }}</td><td>{{ b.jenis }}</td><td class="num">{{ b.bobot|nilai }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+
+  <h3>Hasil perangkingan</h3>
+  <div class="table-wrap"><table class="matrix">
+    <thead><tr><th>Rank</th><th>Supplier</th>{% for b in bobot %}<th class="num">{{ b.kode }}<small class="block">x · r</small></th>{% endfor %}<th class="num">V</th></tr></thead>
+    <tbody>{% for r in hasil %}
+      <tr class="{{ 'win-row' if r.rank == 1 else '' }}"><td>{{ ['🥇','🥈','🥉'][r.rank-1] if r.rank <= 3 else r.rank }}</td><td><b>{{ r.nama }}</b> <small>{{ r.kode }}</small>{% if r.bukti %}<small class="block">📎 {{ r.bukti }}</small>{% endif %}</td>
+        {% for b in bobot %}<td class="num">{{ r.x[b.kode]|nilai }}<small class="block">{{ r.r[b.kode]|angka(3) }}</small></td>{% endfor %}
+        <td class="num"><b>{{ r.v|angka(4) }}</b></td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <footer class="rd-foot">
+    <div><small>Disetujui oleh</small><b>{{ p.dibuat_oleh }}</b><small>{{ p.dibuat_pada|tgl }}</small></div>
+    <p class="hint">Snapshot ini tidak berubah walaupun data supplier, nilai, atau bobot diubah kemudian.</p>
+  </footer>
+</article>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% set judul = 'Kriteria & Bobot' %}
+{% set sub = 'Menentukan apa yang dinilai, jenisnya (benefit / cost), dan seberapa penting setiap kriteria.' %}
+{% block isi %}
+{% if not is_manajer %}<div class="alert info"><div>Anda masuk sebagai <b>{{ user.role }}</b>. Kriteria dan bobot hanya dapat diubah oleh manajer.</div></div>{% endif %}
+<section class="card">
+    <div class="card-h"><h3>⚖️ Daftar Kriteria</h3><span class="badge {{ 'g' if total > 0 else 'r' }}" id="totalBadge">Total bobot {{ total|nilai }}</span></div>
+    <form method="post" id="formBobot">
+      <input type="hidden" name="_token" value="{{ csrf }}"><input type="hidden" name="aksi" value="bobot">
+      {% if is_manajer %}<p class="hint mt0">Ubah <b>jenis</b> dan <b>bobot</b> langsung di tabel, lalu klik <b>Simpan bobot &amp; jenis</b>. Bobot boleh bebas (mis. 25, 30, 20, 15, 10); sistem membaginya dengan total bobot sehingga Σw = 1.</p>{% endif %}
+      <div class="table-wrap"><table>
+        <thead><tr><th>Kode</th><th>Kriteria</th><th style="width:150px">Jenis</th><th>Satuan</th><th class="num" style="width:130px">Bobot</th><th class="num">w<small class="block">ternormalisasi</small></th>{% if is_manajer %}<th></th>{% endif %}</tr></thead>
+        <tbody>
+        {% for k in kriteria %}
+          <tr>
+            <td><code>{{ k.kode }}</code></td>
+            <td class="crit-name"><b>{{ k.nama }}</b><small class="block">{{ k.keterangan or '' }}</small></td>
+            <td>{% if is_manajer %}<select name="jenis_{{ k.id }}" class="jenis-in {{ k.jenis }}" aria-label="Jenis {{ k.kode }}"><option value="benefit" {{ 'selected' if k.jenis == 'benefit' }}>▲ Benefit</option><option value="cost" {{ 'selected' if k.jenis == 'cost' }}>▼ Cost</option></select>{% elif k.jenis == 'benefit' %}<span class="badge">▲ benefit</span>{% else %}<span class="badge o">▼ cost</span>{% endif %}</td>
+            <td>{{ k.satuan or '–' }}</td>
+            <td class="num">{% if is_manajer %}<input class="bobot-in" type="number" name="bobot_{{ k.id }}" value="{{ k.bobot|mentah }}" min="0" step="any" required>{% else %}<b>{{ k.bobot|nilai }}</b>{% endif %}</td>
+            <td class="num" data-w="{{ k.id }}">{{ (k.bobot / total if total else 0)|angka(2) }}</td>
+            {% if is_manajer %}<td class="right nowrap"><a class="btn sm ghost" href="{{ url_for('kriteria', ubah=k.id) }}">✏️</a></td>{% endif %}
+          </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot><tr><th colspan="4" class="right">Total</th><th class="num" id="totalCell">{{ total|nilai }}</th><th class="num">1,00</th>{% if is_manajer %}<th></th>{% endif %}</tr></tfoot>
+      </table></div>
+      <div class="wbar" id="wbar">{% for k in kriteria %}<i style="flex:{{ k.bobot }}" class="w{{ loop.index0 % 6 }}" title="{{ k.kode }} bobot {{ k.bobot|nilai }}">{{ k.kode }}</i>{% endfor %}</div>
+      {% if is_manajer %}<div class="form-actions"><button id="btnBobot">💾 Simpan bobot &amp; jenis</button><span class="hint" id="bobotInfo"></span></div>{% endif %}
+    </form>
+</section>
+
+<div class="grid g2">
+    {% if is_manajer %}
+    <section class="card">
+      <div class="card-h"><h3>{{ '✏️ Ubah ' ~ ubah.kode if ubah else '➕ Tambah Kriteria' }}</h3>{% if ubah %}<a class="btn sm ghost" href="{{ url_for('kriteria') }}">Batal</a>{% endif %}</div>
+      <form method="post">
+        <input type="hidden" name="_token" value="{{ csrf }}"><input type="hidden" name="aksi" value="{{ 'ubah' if ubah else 'tambah' }}">
+        {% if ubah %}<input type="hidden" name="id" value="{{ ubah.id }}">{% endif %}
+        <label for="kn">Nama kriteria *</label><input id="kn" name="nama" value="{{ ubah.nama if ubah else '' }}" required minlength="3" placeholder="cth. Fleksibilitas pembayaran">
+        <label>Jenis *</label>
+        <div class="radio-row">
+          <label class="radio-card"><input type="radio" name="jenis" value="benefit" {{ 'checked' if not ubah or ubah.jenis == 'benefit' else '' }}> ▲ Benefit<small>makin besar makin baik</small></label>
+          <label class="radio-card"><input type="radio" name="jenis" value="cost" {{ 'checked' if ubah and ubah.jenis == 'cost' else '' }}> ▼ Cost<small>makin kecil makin baik</small></label>
+        </div>
+        <label for="ks">Satuan</label><input id="ks" name="satuan" value="{{ ubah.satuan if ubah else '' }}" placeholder="cth. hari, %, skor 1–5">
+        <label for="kk">Keterangan</label><input id="kk" name="keterangan" value="{{ ubah.keterangan if ubah else '' }}">
+        <div class="form-actions"><button class="block">{{ 'Simpan Perubahan' if ubah else 'Tambah Kriteria' }}</button></div>
+      </form>
+      {% if ubah %}
+      <form method="post" data-confirm="Hapus kriteria {{ ubah.kode }} beserta seluruh nilainya?">
+        <input type="hidden" name="_token" value="{{ csrf }}"><input type="hidden" name="aksi" value="hapus"><input type="hidden" name="id" value="{{ ubah.id }}">
+        <button class="r block sm">🗑️ Hapus kriteria ini</button>
+      </form>
+      {% endif %}
+    </section>
+    {% endif %}
+    <section class="card formula">
+      <div class="card-h"><h3>📐 Tabel Cost &amp; Benefit</h3></div>
+      <div class="table-wrap"><table class="cb">
+        <thead><tr><th>▲ Benefit<small class="block">makin besar makin baik</small></th><th>▼ Cost<small class="block">makin kecil makin baik</small></th></tr></thead>
+        <tbody><tr>
+          <td>{% for k in kriteria if k.jenis == 'benefit' %}<div><code>{{ k.kode }}</code> {{ k.nama }}</div>{% else %}<div class="muted">–</div>{% endfor %}</td>
+          <td>{% for k in kriteria if k.jenis == 'cost' %}<div><code>{{ k.kode }}</code> {{ k.nama }}</div>{% else %}<div class="muted">–</div>{% endfor %}</td>
+        </tr>
+        <tr class="f"><td>r = x / max(x)</td><td>r = min(x) / x</td></tr>
+        <tr><td><small>nilai tertinggi → r = 1</small></td><td><small>nilai terendah → r = 1</small></td></tr></tbody>
+      </table></div>
+      <div class="f-box p"><b>Bobot &amp; skor</b><span>w<sub>j</sub> = bobot<sub>j</sub> / Σ bobot</span><span>V = Σ w<sub>j</sub>·r<sub>ij</sub> · skor = 100 × V</span><small>bobot bebas, otomatis dinormalisasi</small></div>
+    </section>
+</div>
+{% endblock %}
+{% block js %}<script>dssBobot();</script>{% endblock %}

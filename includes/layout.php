@@ -25,6 +25,7 @@ function menu_items(string $active = ''): array
             ['beranda', '🏠', 'Beranda', 'beranda.php', $all, 0],
             ['dashboard', '📊', 'Dashboard Saya', home_url(), $all, 0],
             ['mis', '📈', 'MIS · Kinerja Perusahaan', 'mis/index.php', ['manajer'], 0],
+            ['dss', '🧭', 'DSS · Pemilihan Supplier ↗', 'sso_dss.php', $boss, 0],
         ]],
         ['TPS · Transaksi', [
             ['kasir', '🧾', 'Kasir', 'tps/kasir.php', ['admin', 'staff'], 0],
@@ -123,7 +124,7 @@ function page_end(): void
 {
     ?>
     </main>
-    <footer class="foot"><?= APP_NAME ?> © <?= date('Y') ?> · TPS · OAS · KMS terintegrasi · Native PHP + MySQL</footer>
+    <footer class="foot"><?= APP_NAME ?> © <?= date('Y') ?> · TPS · OAS · KMS · MIS · DSS terintegrasi · Native PHP + MySQL</footer>
   </div>
 </div>
 <script src="<?= url('assets/js/app.js') ?>"></script>
