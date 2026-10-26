@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% set judul = 'Kasir per Shift' %}
+{% set sub = 'Berapa kasir yang dibutuhkan di shift pagi dan sore — dari pola jam transaksi TPS ' ~ hs.minggu ~ ' minggu terakhir, dibagi proporsional.' %}
+{% block isi %}
+{% set b = hs.batas %}
+{% if hs.saran_tren %}<div class="alert info"><div><span class="badge src-mis">MIS</span> {{ hs.saran_tren }}</div></div>{% endif %}
+<div class="grid g2">
+{% for r in [hs.kerja, hs.libur] %}
+  <section class="card shift-card">
+    <div class="card-h"><h3>{{ '🗓️' if loop.first else '🎉' }} {{ r.label }}</h3><span class="badge b">puncak {{ '%02d'|format(r.puncak) }}.00</span></div>
+    <div class="shift-split">
+      <div class="sh pagi"><small>☀️ Shift pagi · buka–{{ '%02d'|format(b) }}.00</small><b>{{ r.kasir_pagi }} kasir</b><em>{{ r.pagi|angka(1) }} transaksi/hari · {{ r.porsi_pagi|angka(0) }}%</em>
+        <ul>{% for nm in r.nama_pagi %}<li>👤 {{ nm }}</li>{% endfor %}</ul></div>
+      <div class="sh sore"><small>🌙 Shift sore · {{ '%02d'|format(b) }}.00–tutup</small><b>{{ r.kasir_sore }} kasir</b><em>{{ r.sore|angka(1) }} transaksi/hari · {{ (100 - r.porsi_pagi)|angka(0) }}%</em>
+        <ul>{% for nm in r.nama_sore %}<li>👤 {{ nm }}</li>{% endfor %}</ul></div>
+    </div>
+    {% set mx = r.per_jam|max or 1 %}
+    <div class="jam-bars">{% for j in hs.jam_buka %}{% set v = r.per_jam[loop.index0] %}
+      <div class="jb {{ 'sibuk' if j in r.sibuk }} {{ 'sore' if j >= b else 'pagi' }}" title="{{ '%02d'|format(j) }}.00 · {{ v|angka(2) }} transaksi rata-rata"><i style="height:{{ (v / mx * 100)|round(1) }}%"></i><span>{{ j }}</span></div>
+    {% endfor %}</div>
+    <p class="hint">Jam sibuk (≥ 125% rata-rata {{ r.rata|angka(2) }}/jam): {% for j in r.sibuk %}{{ '%02d'|format(j) }}.00{{ ', ' if not loop.last }}{% else %}tidak ada{% endfor %}</p>
+  </section>
+{% endfor %}
+</div>
+
+<div class="grid g-side-r">
+  <div>
+    <section class="card tight">
+      <div class="card-h"><h3>🔥 Heatmap Rata-rata Transaksi per Jam</h3><span class="hint">rata-rata per hari selama {{ hs.minggu }} minggu</span></div>
+      <div class="table-wrap"><table class="heatmap">
+        <thead><tr><th>Hari</th>{% for j in hs.jam_buka %}<th class="{{ 'batas' if j == b }}">{{ '%02d'|format(j) }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for baris in hs.matriks %}<tr><th>{{ baris.hari }}</th>
+          {% for v in baris.jam %}{% set t = v / hs.maks if hs.maks else 0 %}<td class="{{ 'batas' if hs.jam_buka[loop.index0] == b }}" style="background:rgba(15,118,110,{{ (0.06 + t * 0.9)|round(2) }});color:{{ '#fff' if t > 0.55 else 'var(--ink)' }}" title="{{ baris.hari }} {{ '%02d'|format(hs.jam_buka[loop.index0]) }}.00">{{ v|angka(1) }}</td>{% endfor %}</tr>{% endfor %}
+        </tbody>
+      </table></div>
+      <p class="hint pad">Garis tebal = pergantian shift pukul {{ '%02d'|format(b) }}.00. Makin gelap makin ramai.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h3>📐 Cara Menghitung</h3></div>
+      <p class="mt0">Kasir tersedia per hari <b>{{ hs.kasir }}</b>. Satu kasir minimal di tiap shift, sisanya dibagi sesuai porsi transaksi (metode sisa terbesar):</p>
+      <div class="formula"><div class="f-box"><b>Kasir shift</b><span>1 + (kasir − 2) × transaksi shift ÷ transaksi sehari</span><small>hari kerja: 1 + {{ hs.kasir - 2 }} × {{ hs.kerja.porsi_pagi|angka(1) }}% → {{ hs.kerja.kasir_pagi }} pagi, {{ hs.kerja.kasir_sore }} sore</small></div></div>
+      {% if artikel %}<p class="mt0"><span class="badge src-kms">KMS</span> Acuan untuk kasir: {% for a in artikel %}<b>{{ a.judul }}</b>{{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}
+      {% if agenda %}<p class="mt0"><span class="badge src-oas">OAS</span> Agenda terdekat: {% for a in agenda[:3] %}{{ a.judul }} ({{ a.mulai }}){{ ', ' if not loop.last }}{% endfor %} — hindari bentrok saat menyusun jadwal.</p>{% endif %}
+      <p class="hint">Tren transaksi 7 hari (MIS): <b>{{ (hs.tren|angka(1) ~ '%') if hs.tren is not none else 'belum cukup data' }}</b>. Usulan nama memakai urutan kasir dari kasus <a href="{{ url_for('pegawai') }}">Pegawai Terbaik</a>, ditempatkan bergantian mulai dari shift yang lebih ramai{% if hs.kasir > kasir|length %}; karena kasir aktif hanya {{ kasir|length }} orang, sebagian ditandai “rangkap”{% endif %}.</p>
+      {% if is_manajer %}
+      <form method="post" class="grid g2 mt">
+        <input type="hidden" name="_token" value="{{ csrf }}">
+        <div><label for="judul">Judul keputusan</label><input id="judul" name="judul" value="Jadwal kasir {{ hari_ini }}" maxlength="150"></div>
+        <div><label for="catatan">Catatan manajer</label><input id="catatan" name="catatan" placeholder="cth. berlaku mulai minggu depan, kirim ke OAS"></div>
+        <div class="span2 form-actions"><button>💾 Simpan jadwal kasir</button></div>
+      </form>
+      {% endif %}
+    </section>
+  </div>
+  <aside>
+    {% set param_nama = 'shift' %}
+    {% set param_isi = [('shift_kasir', 'Kasir tersedia per hari', 'orang', 1, 2, 20), ('shift_batas', 'Pergantian shift', 'pukul', 1, 8, 20)] %}
+    {% include '_param.html' %}
+    {% include '_integrasi.html' %}
+  </aside>
+</div>
+{% endblock %}

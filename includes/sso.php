@@ -124,10 +124,21 @@ function dss_ringkasan(): ?array
 /** Daftar keputusan supplier dari DSS untuk panel MIS. null bila DSS tidak berjalan. */
 function dss_keputusan(): ?array
 {
+    $d = dss_keputusan_lengkap();
+    return $d === null ? null : $d['keputusan'];
+}
+
+/** Respons lengkap /api/keputusan: keputusan supplier, keputusan keenam kasus (semua), dan jumlah per kasus. */
+function dss_keputusan_lengkap(): ?array
+{
+    static $cache = false;
+    if ($cache !== false) return $cache;
+    $cache = null;
     if (!dss_hidup()) return null;
     $ts = time();
     $ctx = stream_context_create(['http' => ['timeout' => 2, 'ignore_errors' => true]]);
     $json = @file_get_contents(DSS_API . '/api/keputusan?' . http_build_query(['ts' => $ts, 'sig' => api_sig('dss:keputusan', $ts)]), false, $ctx);
     $data = $json ? json_decode($json, true) : null;
-    return is_array($data) && !empty($data['ok']) ? $data['keputusan'] : null;
+    if (is_array($data) && !empty($data['ok'])) $cache = $data + ['semua' => [], 'per_kasus' => []];
+    return $cache;
 }

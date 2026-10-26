@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% set judul = judul_modul %}
+{% block isi %}
+<div class="card"><div class="empty"><div class="empty-ic">🔌</div><b>Data MartOffice belum dapat diambil</b>
+<p>Kasus ini memakai data TPS, OAS, KMS, dan MIS. Pastikan Apache XAMPP menyala, lalu buka <a href="{{ url_for('integrasi') }}">Integrasi Data</a> dan klik Sinkronkan sekarang.</p></div></div>
+{% endblock %}

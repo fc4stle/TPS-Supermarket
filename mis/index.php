@@ -32,8 +32,9 @@ $topKasir = rows("SELECT g.nama, COUNT(*) n, SUM(t.total) omzet FROM transaksi t
 $topKms = rows("SELECT id, judul, dilihat FROM artikel_kms WHERE status='published' ORDER BY dilihat DESC LIMIT 5");
 $stokMenipis = (int) val('SELECT COUNT(*) FROM produk WHERE aktif=1 AND stok<?', [STOK_MIN]);
 $nilaiStok = (float) val('SELECT COALESCE(SUM(harga*stok),0) FROM produk WHERE aktif=1');
-$dssKep = dss_keputusan();          // keputusan supplier dari DSS (Flask, port 5055)
-$dssRing = $dssKep !== null ? dss_ringkasan() : null;
+$dssAll = dss_keputusan_lengkap();  // keputusan keenam kasus DSS (Flask, port 5055)
+$dssKep = $dssAll['keputusan'] ?? null;
+$dssRing = $dssAll !== null ? dss_ringkasan() : null;
 
 mis_start('Executive Dashboard', 'mis', 'Kinerja perusahaan dalam satu layar — dirangkum dari TPS, OAS, dan KMS.', $per);
 ?>
@@ -112,21 +113,26 @@ mis_start('Executive Dashboard', 'mis', 'Kinerja perusahaan dalam satu layar —
 </div>
 
 <section class="card panel">
-  <div class="card-h"><h3>🧭 Keputusan Supplier dari DSS</h3><a class="btn sm ghost" href="<?= url('sso_dss.php') ?>">Buka DSS ↗</a></div>
-  <?php if ($dssKep === null): ?>
-    <?= empty_state('💤', 'DSS sedang tidak aktif', 'Klik “Buka DSS” — DSS dinyalakan otomatis, lalu keputusan supplier tampil di sini.') ?>
+  <div class="card-h"><h3>🧭 Keputusan dari DSS (6 kasus)</h3><a class="btn sm ghost" href="<?= url('sso_dss.php') ?>">Buka DSS ↗</a></div>
+  <?php if ($dssAll === null): ?>
+    <?= empty_state('💤', 'DSS sedang tidak aktif', 'Klik “Buka DSS” — DSS dinyalakan otomatis, lalu keputusan tampil di sini.') ?>
   <?php else: ?>
-    <div class="grid g-23">
-      <div><?= tabel(['Tanggal', 'Kategori', 'Supplier terpilih', '#Skor', 'Disetujui'], array_map(fn($k) => [
-          tgl($k['dibuat_pada']), e($k['kategori']), '<b>🥇 ' . e($k['pemenang_nama']) . '</b>', number_format($k['skor'], 2, ',', '.'), e($k['dibuat_oleh'])], array_slice($dssKep, 0, 6)),
-          'Belum ada keputusan supplier') ?></div>
-      <div><small class="muted">Juara sementara per kategori (bobot saat ini)</small>
-        <?php foreach (($dssRing['juara'] ?? []) as $i => $j): ?>
-          <div class="rank"><span class="no"><?= e($j['ikon']) ?></span><div class="rb"><b><?= e($j['supplier']) ?></b><small><?= e($j['kategori']) ?></small></div><span class="rv"><?= number_format($j['v'] * 100, 1, ',', '.') ?></span></div>
-        <?php endforeach; ?>
-      </div>
+    <div class="dss-kasus">
+      <?php foreach ($dssAll['per_kasus'] as $k): ?>
+        <div><span><?= e($k['ikon']) ?></span><b><?= e($k['kasus']) ?></b><small><?= e($k['metode']) ?> · <?= (int) $k['jumlah'] ?> keputusan</small></div>
+      <?php endforeach; ?>
     </div>
+    <?= tabel(['Tanggal', 'Kasus', 'Keputusan', 'Tindak lanjut OAS', 'Disetujui'], array_map(fn($k) => [
+        tgl($k['dibuat_pada']), e($k['ikon'] . ' ' . $k['kasus']), '<b>' . e($k['judul']) . '</b><br><small class="muted">' . e($k['ringkasan']) . '</small>',
+        $k['tindak_lanjut'] ? badge($k['tindak_lanjut'] . ' terkirim', 'b') : badge('belum', 'n'), e($k['dibuat_oleh'])], array_slice($dssAll['semua'], 0, 8)),
+        'Belum ada keputusan di DSS') ?>
+    <?php if (!empty($dssRing['juara'])): ?>
+      <p class="muted" style="font-size:12.5px;margin:14px 0 6px">Juara supplier sementara per kategori (bobot saat ini)</p>
+      <div class="dss-juara"><?php foreach ($dssRing['juara'] as $j): ?>
+        <span><?= e($j['ikon']) ?> <b><?= e($j['supplier']) ?></b> <small><?= e($j['kategori']) ?> · <?= number_format($j['v'] * 100, 1, ',', '.') ?></small></span>
+      <?php endforeach; ?></div>
+    <?php endif; ?>
   <?php endif; ?>
-  <?= sumber('DSS · keputusan, supplier, nilai (SQLite) via /api/keputusan') ?>
+  <?= sumber('DSS · keputusan & keputusan_lain (SQLite) via /api/keputusan · tindak lanjut tercatat di tugas/pengumuman/agenda OAS') ?>
 </section>
 <?php mis_end();

@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import json
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -89,6 +90,33 @@ def ambil_data_martoffice(home: str | None = None, timeout: float = 4.0):
         with urllib.request.urlopen(f"{base}/api/dss_data.php?{q}", timeout=timeout) as r:
             data = json.loads(r.read().decode("utf-8"))
     except Exception as ex:  # MartOffice mati, alamat salah, atau tanda tangan ditolak
+        return None, f"{type(ex).__name__}: {ex}"[:200]
+    if not data.get("ok"):
+        return None, data.get("pesan", "Respons tidak valid")
+    return data, None
+
+
+def kirim_martoffice(isi: dict, home: str | None = None, timeout: float = 4.0):
+    """
+    Mengirim tindak lanjut keputusan ke OAS MartOffice (api/dss_kirim.php).
+    Tanda tangan memakai hash isi body sehingga data tidak dapat diubah di jalan.
+    Mengembalikan (respons, None) atau (None, pesan_error).
+    """
+    base = (home or config.MARTOFFICE_URL).rstrip("/")
+    body = json.dumps(isi, ensure_ascii=False).encode("utf-8")
+    ts = int(time.time())
+    sig = tanda_tangan_api("dss:kirim:" + hashlib.sha256(body).hexdigest(), ts)
+    req = urllib.request.Request(f"{base}/api/dss_kirim.php?" + urllib.parse.urlencode({"ts": ts, "sig": sig}), data=body,
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as ex:
+        try:
+            data = json.loads(ex.read().decode("utf-8"))
+        except Exception:
+            return None, f"HTTP {ex.code}"
+    except Exception as ex:
         return None, f"{type(ex).__name__}: {ex}"[:200]
     if not data.get("ok"):
         return None, data.get("pesan", "Respons tidak valid")

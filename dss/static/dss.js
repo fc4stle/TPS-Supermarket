@@ -114,3 +114,34 @@ function dssSimulasi(D) {
   });
   render();
 }
+
+/* Halaman Produk Promo: simulasi what-if diskon dihitung di browser */
+function dssPromo(D) {
+  var P = D.produk, e = +D.elastis, sd = document.getElementById('simDiskon'), sh = document.getElementById('simHari');
+  if (!sd || !P.length) return;
+  function rp(n) { return 'Rp ' + fmt(Math.round(n), 0); }
+  function render() {
+    var d = +sd.value, hari = +sh.value, tot = 0, html = '', habis = 0;
+    document.getElementById('simDiskonV').textContent = d + '%';
+    document.getElementById('simHariV').textContent = hari + ' hari';
+    var f = document.getElementById('fDiskon'); if (f) f.value = d;
+    P.forEach(function (p) {
+      var n0 = p.terjual_30 / 30, n1 = n0 * (1 + e * d / 100), hp = Math.round(p.harga * (1 - d / 100) / 100) * 100;
+      var o0 = Math.min(p.stok, n0 * hari) * p.harga, o1 = Math.min(p.stok, n1 * hari) * hp, sel = o1 - o0;
+      var lama = n1 > 0 ? p.stok / n1 : null;
+      if (lama !== null && lama <= hari) habis++;
+      tot += sel;
+      html += '<tr><td><b>' + p.nama + '</b><small class="block">stok ' + p.stok + ' ' + p.satuan + '</small></td>' +
+        '<td class="num nowrap"><s>' + rp(p.harga) + '</s><small class="block"><b>' + rp(hp) + '</b></small></td>' +
+        '<td class="num">' + fmt(n0, 1) + ' → <b>' + fmt(n1, 1) + '</b></td>' +
+        '<td class="num">' + (lama === null ? '–' : '<span class="badge ' + (lama <= hari ? '' : 'y') + '">' + fmt(lama, 0) + ' hari</span>') + '</td>' +
+        '<td class="num nowrap">' + rp(o0) + ' → <b>' + rp(o1) + '</b><small class="block ' + (sel >= 0 ? 'up' : 'down') + '">' + (sel >= 0 ? '+' : '−') + rp(Math.abs(sel)) + '</small></td></tr>';
+    });
+    document.getElementById('simBody').innerHTML = html;
+    var t = document.getElementById('simTotal');
+    t.innerHTML = '<span class="' + (tot >= 0 ? 'up' : 'down') + '">' + (tot >= 0 ? '+' : '−') + rp(Math.abs(tot)) + '</span>';
+    document.getElementById('simInfo').textContent = habis + ' dari ' + P.length + ' produk habis dalam ' + hari + ' hari';
+  }
+  sd.addEventListener('input', render); sh.addEventListener('input', render);
+  render();
+}

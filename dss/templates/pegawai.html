@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% set judul = 'Pegawai Terbaik' %}
+{% set sub = 'Siapa pegawai dengan kinerja terbaik — SAW gabungan transaksi (TPS), tugas & ketepatan waktu (OAS), dan kontribusi pengetahuan (KMS).' %}
+{% block isi %}
+{% set K = h.kriteria %}
+{% if h.ranking %}
+{% set win = h.ranking[0] %}{% set wi = info[win.id] %}
+<section class="winner">
+  <div class="w-medal">🏅</div>
+  <div class="w-body">
+    <small>Pegawai terbaik periode ini</small>
+    <h2>{{ win.nama }}</h2>
+    <p>{{ wi.jabatan|capitalize }} · skor <b>{{ (win.v * 100)|angka(2) }}</b>{% if h.ranking|length > 1 %}, unggul {{ ((win.v - h.ranking[1].v) * 100)|angka(2) }} poin dari {{ h.ranking[1].nama }}{% endif %} —
+      {{ wi.transaksi }} transaksi, {{ wi.tugas_selesai }} tugas selesai ({{ wi.tepat|angka(0) }}% tepat waktu), {{ wi.knowledge }} knowledge dibagikan.</p>
+  </div>
+</section>
+
+<div class="grid g-side-r">
+  <div>
+    <div class="emp-grid">
+    {% for r in h.ranking %}{% set g = info[r.id] %}
+      <div class="emp {{ 'top' if r.rank == 1 }}">
+        <div class="emp-h"><span class="emp-av">{{ g.nama[:1] }}</span><div><b>{{ g.nama }}</b><small>{{ g.jabatan }}</small></div><span class="emp-rk">{{ ['🥇','🥈','🥉'][r.rank-1] if r.rank <= 3 else '#' ~ r.rank }}</span></div>
+        <div class="rk-bar"><i style="width:{{ r.v / win.v * 100 }}%"></i></div>
+        <div class="emp-skor"><b>{{ (r.v * 100)|angka(2) }}</b><small>skor</small></div>
+        <dl>
+          <div><dt>🧾 Transaksi</dt><dd>{{ g.transaksi }}</dd></div>
+          <div><dt>💰 Omzet</dt><dd>{{ g.omzet|rp }}</dd></div>
+          {% if g.porsi is not none %}<div><dt>📈 Porsi omzet toko (MIS)</dt><dd>{{ g.porsi|angka(1) }}%</dd></div>{% endif %}
+          <div><dt>✅ Tugas selesai</dt><dd>{{ g.tugas_selesai }} · {{ g.tepat|angka(0) }}% tepat</dd></div>
+          <div><dt>⏰ Terlambat</dt><dd>{{ g.terlambat }}</dd></div>
+          <div><dt>📚 Knowledge</dt><dd>{{ g.knowledge }} · {{ g.dinilai_membantu }} 👍</dd></div>
+        </dl>
+      </div>
+    {% endfor %}
+    </div>
+
+    {% include '_bobot_modul.html' %}
+
+    <section class="card tight">
+      <div class="card-h"><h3><span class="stepno">1</span> Matriks Keputusan (X) &amp; Normalisasi (r)</h3><span class="hint">semua nilai +1 agar tidak ada pembagian dengan nol</span></div>
+      <div class="table-wrap"><table class="matrix">
+        <thead><tr><th>Pegawai</th>{% for k in K %}<th class="num">{{ k.kode }}<small class="block">{{ k.nama }}</small><span class="badge {{ '' if k.jenis == 'benefit' else 'o' }}">{{ '▲' if k.jenis == 'benefit' else '▼' }} {{ k.jenis }}</span></th>{% endfor %}</tr></thead>
+        <tbody>{% for a in h.alternatif %}<tr><td><b>{{ a.kode }}</b> {{ a.nama }}</td>{% for k in K %}{% set rr = h.R[a.id][k.id] %}<td class="num {{ 'best' if rr|round(6) == 1 }}">{{ h.X[a.id][k.id]|nilai }}<small class="block">r {{ rr|angka(3) }}</small></td>{% endfor %}</tr>{% endfor %}</tbody>
+        <tfoot><tr><th>Max / Min</th>{% for k in K %}<th class="num">{{ 'max' if k.jenis == 'benefit' else 'min' }} = {{ h.pembagi[k.id]|nilai }}</th>{% endfor %}</tr></tfoot>
+      </table></div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h3><span class="stepno">2</span> Nilai Preferensi (V)</h3><span class="hint">V = Σ w · r · skor = 100 × V</span></div>
+      <div class="ranking">{% for r in h.ranking %}
+        <div class="rk {{ 'top' if r.rank == 1 }}"><span class="rk-no">{{ r.rank }}</span><div class="rk-body">
+          <div class="rk-head"><b>{{ r.nama }}</b><span class="rk-v">{{ r.v|angka(4) }}<span class="rk-skor">skor {{ (r.v * 100)|angka(2) }}</span></span></div>
+          <small class="rk-f">V = {% for k in K %}{{ h.w[k.id]|angka(2) }}×{{ h.R[r.id][k.id]|angka(3) }}{{ ' + ' if not loop.last }}{% endfor %}</small>
+        </div></div>{% endfor %}
+      </div>
+      {% if is_manajer %}
+      <form method="post" class="grid g2 mt">
+        <input type="hidden" name="_token" value="{{ csrf }}">
+        <div><label for="judul">Judul keputusan</label><input id="judul" name="judul" value="Pegawai terbaik {{ hari_ini }}" maxlength="150"></div>
+        <div><label for="catatan">Catatan manajer</label><input id="catatan" name="catatan" placeholder="cth. hadiah voucher belanja Rp100.000"></div>
+        <div class="span2 form-actions"><button>🏅 Tetapkan {{ win.nama }} sebagai pegawai terbaik</button></div>
+      </form>
+      {% endif %}
+    </section>
+  </div>
+  <aside>
+    {% include '_integrasi.html' %}
+  </aside>
+</div>
+{% else %}
+<div class="card"><div class="empty"><div class="empty-ic">🏅</div><b>Belum ada data pegawai</b></div></div>
+{% endif %}
+{% endblock %}
+{% block js %}<script>dssBobot();</script>{% endblock %}

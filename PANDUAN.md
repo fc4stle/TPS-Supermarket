@@ -23,7 +23,7 @@ Sistem terpadu supermarket: **TPS** (kasir, nota, stok, laporan) + **OAS** (tuga
 ## Beranda
 Setelah login, semua role masuk ke **Beranda MartOffice** yang berisi lima kartu modul (TPS, OAS, KMS, MIS, DSS) dengan tombol **Buka modul**. Kartu MIS terkunci untuk admin dan staff; kartu DSS terkunci untuk staff.
 
-## DSS · Pemilihan Supplier (Flask + SQLite, port 5055)
+## DSS MartOffice — 6 kasus keputusan (Flask + SQLite, port 5055)
 DSS adalah aplikasi terpisah yang berjalan **bersamaan** dengan XAMPP.
 
 | Layanan | Port |
@@ -49,7 +49,23 @@ DSS adalah aplikasi terpisah yang berjalan **bersamaan** dengan XAMPP.
 
 **Hak akses DSS:** manajer = semua fitur (ubah bobot, simpan keputusan, hapus); admin = kelola supplier & penilaian, lihat hasil; staff = tidak bisa masuk.
 
-**Menu DSS:** Dashboard (juara per kategori, prioritas dari TPS & MIS, referensi dokumen OAS dan SOP KMS), Data Supplier, Kriteria & Bobot, Penilaian, Perhitungan SAW langkah demi langkah, Analisis Sensitivitas, Riwayat Keputusan (cetak/CSV), Integrasi Data (sinkronisasi & API), dan Log SSO. Keputusan DSS juga tampil di **MIS → Executive Dashboard**.
+**Menu DSS** dimulai dari **Pusat Keputusan** (ringkasan keenam kasus + keputusan terbaru) dan **Alternatif & Hasil** (daftar alternatif kasus, rumus, sumber data, dan hasil perhitungan semua kasus dalam satu halaman yang bisa dicetak):
+
+| No | Kasus | Pertanyaan | Metode | Data dari |
+|---|---|---|---|---|
+| 1 | Pemilihan Supplier | Supplier mana yang dipilih per kategori? | SAW | TPS, OAS, KMS |
+| 2 | Rekomendasi Restok | Produk apa yang dipesan sekarang & berapa? | Reorder point | TPS, MIS, hasil kasus 1 |
+| 3 | Produk Promo | Produk apa yang didiskon & dampaknya? | SAW + simulasi what-if | TPS, MIS, KMS |
+| 4 | Paket Bundling | Produk apa yang dijual sebagai paket? | Analisis keranjang (support, confidence, lift) | TPS, KMS |
+| 5 | Pegawai Terbaik | Siapa pegawai berkinerja terbaik? | SAW | TPS, OAS, KMS |
+| 6 | Kasir per Shift | Berapa kasir di shift pagi & sore? | Pola jam sibuk + pembagian proporsional | TPS, OAS |
+
+**Integrasi dua arah dengan TPS · OAS · KMS · MIS** (lihat tabel *Peta Integrasi* di Pusat Keputusan):
+- **Masuk** (`api/dss_data.php`): setiap kasus memakai data keempat modul — mis. Restok menandai produk yang ada di Pusat Peringatan **MIS**, membatasi siklus produk segar sesuai SOP Kedaluwarsa & FIFO di **KMS**, dan menandai produk yang sudah punya tugas restok di **OAS**; Promo memakai omzet toko 30 hari dari **MIS** dan menandai produk yang sudah diumumkan promonya di **OAS**; Kasir per Shift memakai tren transaksi 7 hari dari **MIS**.
+- **Keluar** (`api/dss_kirim.php`): di halaman detail keputusan, manajer klik **Kirim ke OAS** untuk membuat pengumuman, tugas staf (judul diawali `[DSS]`), atau agenda. Tugas otomatis diberikan ke staf yang sesuai (gudang/toko). **MIS → Executive Dashboard** menampilkan keputusan keenam kasus beserta status tindak lanjutnya.
+- Semua permintaan antar-aplikasi ditandatangani HMAC-SHA256 dengan `SSO_SECRET`.
+
+Setiap kasus punya **parameter/bobot** yang bisa diubah manajer dan tombol **Simpan keputusan**. Semua keputusan masuk **Riwayat Keputusan** (bisa difilter per kasus dan dicetak). Menu lain: Integrasi Data (sinkronisasi & API) dan Log SSO. Keputusan supplier juga tampil di **MIS → Executive Dashboard**.
 
 Jika port 5055 sudah dipakai, ganti `PORT` di `dss/config.py` **dan** `DSS_PORT` di `includes/config.php` dengan angka yang sama.
 

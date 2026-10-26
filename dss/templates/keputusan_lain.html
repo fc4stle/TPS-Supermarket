@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% set judul = 'Detail Keputusan' %}
+{% set sub = info[0] ~ ' ' ~ info[1] ~ ' · disimpan ' ~ (p.dibuat_pada|tgl) ~ ' oleh ' ~ p.dibuat_oleh %}
+{% set LABEL = {'restok_siklus': 'Siklus pemesanan (hari)', 'restok_aman': 'Stok pengaman (hari)', 'restok_lead': 'Lead time bawaan (hari)', 'restok_segar': 'Siklus maks. produk segar (hari)',
+                'diskon': 'Diskon (%)', 'kasir': 'Kasir per hari', 'batas': 'Pergantian shift (pukul)', 'bobot': 'Bobot kriteria'} %}
+{% set HREF = {'restok': 'restok', 'promo': 'promo', 'bundling': 'bundling', 'pegawai': 'pegawai', 'shift': 'shift'} %}
+{% block isi %}
+<div class="actions no-print" style="margin-bottom:16px">
+  <a class="btn ghost" href="{{ url_for('keputusan', modul=p.modul) }}">← Riwayat</a>
+  <button type="button" onclick="window.print()">🖨️ Cetak</button>
+  {% if p.modul in HREF %}<a class="btn ghost" href="{{ url_for(HREF[p.modul]) }}">{{ info[0] }} Buka kasus</a>{% endif %}
+  {% if is_manajer %}<form method="post" action="{{ url_for('keputusan_lain_hapus', kid=p.id) }}" class="inline" data-confirm="Hapus riwayat keputusan ini?"><input type="hidden" name="_token" value="{{ csrf }}"><button class="ghost">🗑️ Hapus</button></form>{% endif %}
+</div>
+<article class="card report-doc">
+  <header class="rd-head">
+    <div><small>BERITA ACARA KEPUTUSAN · DSS MARTOFFICE</small><h2>{{ p.judul }}</h2><p>No. DSS-{{ p.modul|upper }}-{{ '%04d' % p.id }} · {{ info[1] }} · Metode {{ info[2] }}</p></div>
+    <span class="rd-logo">{{ info[0] }}</span>
+  </header>
+  <section class="winner sm">
+    <div class="w-medal">{{ info[0] }}</div>
+    <div class="w-body"><small>Keputusan</small><h2>{{ p.ringkasan }}</h2></div>
+  </section>
+  {% if p.catatan %}<div class="note"><b>Catatan manajer:</b> {{ p.catatan }}</div>{% endif %}
+
+  <h3>Rincian</h3>
+  <div class="table-wrap"><table>
+    <thead><tr>{% for k in d.kolom %}<th class="{{ 'num' if loop.index0 and d.baris and d.baris[0][loop.index0] is number }}">{{ k }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for b in d.baris %}<tr class="{{ 'win-row' if loop.first and p.modul in ('promo', 'pegawai') }}">
+      {% for v in b %}{% set kol = d.kolom[loop.index0] %}
+        <td class="{{ 'num' if v is number and loop.index0 }}">{% if v is number and 'Harga' in kol %}{{ v|rp }}{% elif v is number and loop.index0 %}{{ v|nilai }}{% else %}{{ v }}{% endif %}</td>
+      {% endfor %}</tr>{% endfor %}</tbody>
+  </table></div>
+
+  {% if d.parameter %}
+  <h3>Parameter saat keputusan dibuat</h3>
+  <div class="table-wrap"><table>
+    <tbody>{% for k, v in d.parameter.items() %}<tr><th style="width:260px">{{ LABEL.get(k, k) }}</th>
+      <td>{% if v is mapping %}{% for kk, vv in v.items() %}<code>{{ kk }}</code> {{ vv|nilai }}{{ ' · ' if not loop.last }}{% endfor %}{% else %}{{ v|nilai }}{% endif %}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+  <footer class="rd-foot">
+    <div><small>Disetujui oleh</small><b>{{ p.dibuat_oleh }}</b><small>{{ p.dibuat_pada|tgl }}</small></div>
+    <p class="hint">Snapshot ini tidak berubah walaupun data TPS, OAS, KMS, atau bobot berubah kemudian.</p>
+  </footer>
+</article>
+{% include '_tindak_lanjut.html' %}
+{% endblock %}

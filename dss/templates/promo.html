@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% set judul = 'Produk Promo / Diskon' %}
+{% set sub = 'Produk mana yang paling perlu didiskon — SAW atas data penjualan TPS, tren MIS, dan risiko kedaluwarsa dari SOP KMS, lalu disimulasikan dampaknya.' %}
+{% block isi %}
+{% set K = h.kriteria %}
+{% set top = h.ranking[:n] %}
+{% if top %}
+<section class="winner">
+  <div class="w-medal">🏷️</div>
+  <div class="w-body">
+    <small>Kandidat promo teratas</small>
+    <h2>{{ top[0].nama }}</h2>
+    <p>Skor <b>{{ (top[0].v * 100)|angka(2) }}</b> · stok {{ info[top[0].id].stok }} {{ info[top[0].id].satuan }} cukup untuk <b>{{ info[top[0].id].hari|angka(0) }} hari</b>
+      {% if info[top[0].id].turun > 0 %}· penjualan turun {{ info[top[0].id].turun|angka(0) }}% dari 30 hari sebelumnya{% endif %} — {{ n }} produk teratas diusulkan masuk promo.</p>
+  </div>
+  <a class="btn y" href="#simulasi">🧪 Simulasikan diskon</a>
+</section>
+{% endif %}
+
+<div class="grid g-side-r">
+  <div>
+    <section class="card">
+      <div class="card-h"><h3>🏆 Ranking Kandidat Promo</h3><span class="hint">{{ h.ranking|length }} produk berstok · skor = 100 × V</span></div>
+      <div class="ranking promo-rk">
+      {% for r in h.ranking[:10] %}{% set p = info[r.id] %}
+        <div class="rk {{ 'top' if r.rank == 1 else '' }} {{ 'pilih' if r.rank <= n else '' }}">
+          <span class="rk-no">{{ r.rank }}</span>
+          <div class="rk-body">
+            <div class="rk-head"><b>{{ p.ikon }} {{ r.nama }} {% if r.rank <= n %}<span class="badge y">promo</span>{% endif %}{% if p.promo_oas %}<span class="badge src-oas" title="Kategori ini sudah disebut di pengumuman/agenda promo OAS">sudah ada promo (OAS)</span>{% endif %}</b><span class="rk-v">{{ (r.v * 100)|angka(2) }}</span></div>
+            <div class="rk-bar"><i style="width:{{ r.v / h.ranking[0].v * 100 }}%"></i></div>
+            <small class="rk-f">{{ p.kategori }} · stok {{ p.stok }} · {{ p.hari|angka(0) }} hari persediaan · terjual {{ p.terjual_30 }} (30 hr) vs {{ p.terjual_lalu }} sebelumnya · risiko kedaluwarsa {{ risiko.get(p.kategori, 2) }}/5</small>
+          </div>
+        </div>
+      {% endfor %}
+      </div>
+    </section>
+
+  </div>
+  <aside>
+    {% set param_nama = 'promo' %}
+    {% set param_isi = [('promo_jumlah', 'Jumlah produk promo', 'produk', 1, 1, 20), ('promo_elastis', 'Elastisitas permintaan', '×', 0.1, 0, 5)] %}
+    {% include '_param.html' %}
+    {% include '_integrasi.html' %}
+    {% if promo_oas %}<section class="card">
+      <div class="card-h"><h3>📢 Promo Berjalan di OAS</h3></div>
+      <ul class="ref">{% for x in promo_oas %}<li><span class="badge src-oas">OAS</span> {{ x.judul }} <small>· {{ x.tanggal or x.mulai }}</small></li>{% endfor %}</ul>
+      <p class="hint mt0">Produk di kategori yang sudah dipromosikan diberi tanda agar tidak didiskon dua kali.</p>
+    </section>{% endif %}
+    <section class="card">
+      <div class="card-h"><h3>📚 Acuan KMS</h3></div>
+      <ul class="ref">{% for a in artikel %}<li>📄 {{ a.judul }} <small>· {{ a.dilihat }}× dilihat</small></li>{% else %}<li><small>Belum ada artikel terkait.</small></li>{% endfor %}</ul>
+      <table class="mini"><thead><tr><th>Kategori</th><th class="num">Risiko</th></tr></thead>
+        <tbody>{% for k, v in risiko|dictsort(by='value', reverse=true) %}<tr><td>{{ k }}</td><td class="num">{{ '●' * v }}<span class="muted">{{ '●' * (5 - v) }}</span></td></tr>{% endfor %}</tbody></table>
+    </section>
+  </aside>
+</div>
+    <section class="card tight">
+      <div class="card-h"><h3><span class="stepno">1</span> Matriks Keputusan &amp; Normalisasi (10 teratas)</h3><span class="hint">nilai X → r</span></div>
+      <div class="table-wrap"><table class="matrix">
+        <thead><tr><th>Produk</th>{% for k in K %}<th class="num">{{ k.kode }}<small class="block">{{ k.nama }}</small><span class="badge {{ '' if k.jenis == 'benefit' else 'o' }}">{{ '▲' if k.jenis == 'benefit' else '▼' }} {{ k.jenis }}</span></th>{% endfor %}<th class="num">V</th></tr></thead>
+        <tbody>{% for r in h.ranking[:10] %}<tr><td><b>{{ r.kode }}</b> {{ r.nama }}</td>
+          {% for k in K %}<td class="num">{{ h.X[r.id][k.id]|nilai }}<small class="block">r {{ h.R[r.id][k.id]|angka(3) }}</small></td>{% endfor %}<td class="num"><b>{{ r.v|angka(4) }}</b></td></tr>{% endfor %}</tbody>
+        <tfoot><tr><th>Max / Min</th>{% for k in K %}<th class="num">{{ 'max' if k.jenis == 'benefit' else 'min' }} = {{ h.pembagi[k.id]|nilai }}</th>{% endfor %}<th></th></tr></tfoot>
+      </table></div>
+      <p class="hint pad">P1 = stok ÷ rata harian (maks. 120) · P2 = % penurunan penjualan + 1 · P3 = skor risiko kategori (SOP kedaluwarsa KMS) · P4 = % kontribusi omzet terhadap omzet toko 30 hari dari MIS ({{ mo.mis.omzet_30|rp }}) (cost: produk andalan tidak perlu didiskon).</p>
+    </section>
+
+    {% include '_bobot_modul.html' %}
+
+    <section class="card" id="simulasi">
+      <div class="card-h"><h3>🧪 Simulasi What-if Diskon</h3><span class="badge b" id="simInfo"></span></div>
+      <div class="sim-ctrl">
+        <label for="simDiskon">Diskon <b id="simDiskonV"></b></label>
+        <input type="range" id="simDiskon" min="5" max="50" step="5" value="15">
+        <label for="simHari">Lama promo <b id="simHariV"></b></label>
+        <input type="range" id="simHari" min="3" max="30" step="1" value="14">
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Produk promo</th><th class="num">Harga<small class="block">normal → promo</small></th><th class="num">Jual/hari<small class="block">normal → promo</small></th><th class="num">Stok habis dalam</th><th class="num">Omzet periode<small class="block">normal → promo</small></th></tr></thead>
+        <tbody id="simBody"></tbody>
+        <tfoot><tr><th colspan="4" class="right">Total selisih omzet</th><th class="num" id="simTotal"></th></tr></tfoot>
+      </table></div>
+      <p class="hint pad">Asumsi elastisitas {{ st.promo_elastis|nilai }}: diskon 10% menaikkan penjualan {{ (st.promo_elastis * 10)|nilai }}%. Omzet dibatasi oleh stok yang ada. Tujuan promo adalah menghabiskan stok lambat laku/rawan kedaluwarsa — selisih omzet negatif berarti biaya promo.</p>
+      {% if is_manajer and top %}
+      <form method="post" class="grid g2 pad">
+        <input type="hidden" name="_token" value="{{ csrf }}"><input type="hidden" name="diskon" id="fDiskon" value="15">
+        <div><label for="judul">Judul keputusan</label><input id="judul" name="judul" value="Produk promo {{ hari_ini }}" maxlength="150"></div>
+        <div><label for="catatan">Catatan manajer</label><input id="catatan" name="catatan" placeholder="cth. promo akhir pekan, pasang label di rak"></div>
+        <div class="span2 form-actions"><button id="btnPromo">💾 Simpan keputusan promo</button><span class="hint">{{ n }} produk teratas dengan diskon yang dipilih di simulasi.</span></div>
+      </form>
+      {% endif %}
+    </section>
+  
+<script id="sim-data" type="application/json">{{ {'produk': sim[:n], 'elastis': st.promo_elastis}|tojson }}</script>
+{% endblock %}
+{% block js %}<script>dssBobot(); dssPromo(JSON.parse(document.getElementById('sim-data').textContent));</script>{% endblock %}

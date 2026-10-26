@@ -1,0 +1,11 @@
+{# Kartu keterhubungan kasus dengan TPS, OAS, KMS, MIS. Variabel: integ #}
+<section class="card integ">
+  <div class="card-h"><h3>🔗 Terhubung dengan MartOffice</h3>{% if mo and mo._offline %}<span class="badge y">snapshot</span>{% else %}<span class="badge">live</span>{% endif %}</div>
+  <div class="integ-in">
+    {% for m in ['TPS', 'OAS', 'KMS', 'MIS'] %}
+      <div><span class="badge src-{{ m|lower }}">{{ m }}</span><span>{{ integ.masuk[m] }}</span></div>
+    {% endfor %}
+  </div>
+  <div class="integ-out"><b>↩ Keluaran ke MartOffice</b><span>{{ integ.keluar }}</span>
+    <small>{{ integ.terkirim }} tindak lanjut sudah dikirim · kirim dari halaman detail keputusan setelah disimpan</small></div>
+</section>

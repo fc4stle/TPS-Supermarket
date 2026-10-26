@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% set judul = 'Alternatif Kasus & Hasil Perhitungan' %}
+{% set sub = 'Enam alternatif DSS yang dikembangkan dari data TPS, OAS, KMS, dan MIS beserta hasil perhitungan sistem saat ini.' %}
+{% set HREF = {'supplier': 'hitung', 'restok': 'restok', 'promo': 'promo', 'bundling': 'bundling', 'pegawai': 'pegawai', 'shift': 'shift'} %}
+{% block isi %}
+<div class="actions no-print" style="margin-bottom:16px">
+  <button type="button" onclick="window.print()">🖨️ Cetak / simpan PDF</button>
+  {% if mo %}<span class="hint">Data MartOffice diambil {{ mo._waktu|tgl }}{{ ' (snapshot)' if mo._offline }}</span>{% endif %}
+</div>
+
+<section class="card tight">
+  <div class="card-h"><h3>🗂️ Daftar Alternatif Kasus DSS</h3><span class="hint">semua kasus terintegrasi dengan TPS · OAS · KMS · MIS</span></div>
+  <div class="table-wrap"><table class="alt-tab">
+    <thead><tr><th>No</th><th>Kasus</th><th>Masalah keputusan</th><th>Jenis</th><th>Metode</th><th>Hasil saat ini</th></tr></thead>
+    <tbody>
+    {% for kode, (ic, nama, metode) in MODUL.items() %}
+      <tr><td>{{ loop.index }}</td><td class="nowrap"><a href="#k-{{ kode }}"><b>{{ ic }} {{ nama }}</b></a></td><td>{{ alt[kode].masalah }}</td><td>{{ alt[kode].jenis }}</td><td class="nowrap">{{ metode }}</td>
+        <td>{% if kode == 'supplier' %}{{ h.supplier|length }} kategori · {{ (h.supplier[0].supplier ~ ' (' ~ h.supplier[0].kategori ~ ')') if h.supplier else '–' }}
+            {% elif not mo %}menunggu data
+            {% elif kode == 'restok' %}{{ h.restok|length }} produk dipesan · {{ h.restok|sum(attribute='saran') }} unit
+            {% elif kode == 'promo' %}{{ h.promo.rank[0].nama if h.promo.rank else '–' }} (skor {{ (h.promo.rank[0].v * 100)|angka(2) if h.promo.rank else '–' }})
+            {% elif kode == 'bundling' %}{{ (h.bundling[0].a.nama ~ ' + ' ~ h.bundling[0].b.nama ~ ' · lift ' ~ (h.bundling[0].lift|angka(2))) if h.bundling else '–' }}
+            {% elif kode == 'pegawai' %}{{ h.pegawai.rank[0].nama if h.pegawai.rank else '–' }} (skor {{ (h.pegawai.rank[0].v * 100)|angka(2) if h.pegawai.rank else '–' }})
+            {% elif kode == 'shift' %}hari kerja {{ h.shift.kerja.kasir_pagi }} pagi + {{ h.shift.kerja.kasir_sore }} sore{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+{% for kode, (ic, nama, metode) in MODUL.items() %}
+{% set a = alt[kode] %}{% set g = integ[kode] %}
+<section class="card alt-case" id="k-{{ kode }}">
+  <div class="card-h"><h3><span class="stepno">{{ loop.index }}</span> {{ ic }} {{ nama }}</h3><a class="btn sm ghost no-print" href="{{ url_for(HREF[kode]) }}">Buka kasus →</a></div>
+  <div class="alt-grid">
+    <div class="alt-info">
+      <dl>
+        <dt>Masalah</dt><dd>{{ a.masalah }}</dd>
+        <dt>Pengambil keputusan</dt><dd>{{ a.pengambil }}</dd>
+        <dt>Metode</dt><dd>{{ metode }}</dd>
+        <dt>Kriteria / variabel</dt><dd>{{ a.kriteria }}</dd>
+      </dl>
+      <div class="alt-rumus">{% for r in a.rumus %}<code>{{ r }}</code>{% endfor %}</div>
+      <div class="integ-in mt">{% for m in ['TPS', 'OAS', 'KMS', 'MIS'] %}<div><span class="badge src-{{ m|lower }}">{{ m }}</span><span>{{ g.masuk[m] }}</span></div>{% endfor %}</div>
+      <p class="hint mt0" style="margin-top:8px">↩ {{ g.keluar }}</p>
+    </div>
+    <div class="alt-hasil">
+      <b class="alt-h">📊 Hasil perhitungan sistem</b>
+      {% if kode == 'supplier' %}
+        <div class="table-wrap"><table class="mini2"><thead><tr><th>Kategori</th><th>Supplier terpilih</th><th class="num">V</th><th>Peringkat 2</th><th class="num">V</th></tr></thead>
+          <tbody>{% for j in h.supplier %}<tr><td>{{ j.ikon }} {{ j.kategori }}</td><td><b>🥇 {{ j.supplier }}</b></td><td class="num">{{ j.v|angka(4) }}</td><td>{{ j.kedua }}</td><td class="num">{{ j.v2|angka(4) if j.v2 is not none else '–' }}</td></tr>{% endfor %}</tbody></table></div>
+      {% elif not mo %}<div class="empty sm">Data MartOffice belum dapat diambil.</div>
+      {% elif kode == 'restok' %}
+        <div class="table-wrap"><table class="mini2"><thead><tr><th>Produk</th><th class="num">Stok</th><th class="num">d</th><th class="num">L</th><th class="num">ROP</th><th class="num">Target</th><th class="num">Q pesan</th></tr></thead>
+          <tbody>{% for r in h.restok %}<tr><td>{{ r.ikon }} {{ r.nama }}</td><td class="num">{{ r.stok }}</td><td class="num">{{ r.rata|angka(2) }}</td><td class="num">{{ r.lead|nilai }}</td><td class="num">{{ r.rop|angka(1) }}</td><td class="num">{{ r.target|angka(1) }}</td><td class="num"><b>{{ r.saran }}</b> {{ r.satuan }}</td></tr>{% else %}<tr><td colspan="7">Semua stok aman.</td></tr>{% endfor %}</tbody></table></div>
+      {% elif kode == 'promo' %}
+        <div class="table-wrap"><table class="mini2"><thead><tr><th>Rank</th><th>Produk</th>{% for k in h.promo.krit %}<th class="num">{{ k.kode }}</th>{% endfor %}<th class="num">Skor</th></tr></thead>
+          <tbody>{% for r in h.promo.rank %}<tr><td>{{ r.rank }}</td><td>{{ h.promo.info[r.id].ikon }} {{ r.nama }}</td>{% for k in h.promo.krit %}<td class="num">{{ h.promo.X[r.id][k.id]|nilai }}</td>{% endfor %}<td class="num"><b>{{ (r.v * 100)|angka(2) }}</b></td></tr>{% endfor %}</tbody></table></div>
+      {% elif kode == 'bundling' %}
+        <div class="table-wrap"><table class="mini2"><thead><tr><th>Paket</th><th class="num">n(A∩B)</th><th class="num">Support</th><th class="num">Conf A→B</th><th class="num">Lift</th><th class="num">Harga paket</th></tr></thead>
+          <tbody>{% for r in h.bundling %}<tr><td>{{ r.a.nama }} + {{ r.b.nama }}</td><td class="num">{{ r.bersama }}</td><td class="num">{{ r.support|angka(2) }}%</td><td class="num">{{ r.conf_ab|angka(1) }}%</td><td class="num"><b>{{ r.lift|angka(2) }}</b></td><td class="num">{{ r.harga_paket|rp }}</td></tr>{% endfor %}</tbody></table></div>
+      {% elif kode == 'pegawai' %}
+        <div class="table-wrap"><table class="mini2"><thead><tr><th>Rank</th><th>Pegawai</th>{% for k in h.pegawai.krit %}<th class="num">{{ k.kode }}</th>{% endfor %}<th class="num">Skor</th></tr></thead>
+          <tbody>{% for r in h.pegawai.rank %}<tr><td>{{ r.rank }}</td><td>{{ r.nama }}</td>{% for k in h.pegawai.krit %}<td class="num">{{ h.pegawai.X[r.id][k.id]|nilai }}</td>{% endfor %}<td class="num"><b>{{ (r.v * 100)|angka(2) }}</b></td></tr>{% endfor %}</tbody></table></div>
+      {% elif kode == 'shift' %}
+        <div class="table-wrap"><table class="mini2"><thead><tr><th>Hari</th><th class="num">Transaksi pagi</th><th class="num">Transaksi sore</th><th class="num">Porsi pagi</th><th class="num">Kasir pagi</th><th class="num">Kasir sore</th><th class="num">Jam puncak</th></tr></thead>
+          <tbody>{% for r in [h.shift.kerja, h.shift.libur] %}<tr><td>{{ r.label }}</td><td class="num">{{ r.pagi|angka(1) }}</td><td class="num">{{ r.sore|angka(1) }}</td><td class="num">{{ r.porsi_pagi|angka(1) }}%</td><td class="num"><b>{{ r.kasir_pagi }}</b></td><td class="num"><b>{{ r.kasir_sore }}</b></td><td class="num">{{ '%02d'|format(r.puncak) }}.00</td></tr>{% endfor %}</tbody></table></div>
+        <p class="hint">Kasir tersedia {{ h.shift.kasir }} orang/hari · tren transaksi 7 hari (MIS): {{ (h.shift.tren|angka(1) ~ '%') if h.shift.tren is not none else '–' }}</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

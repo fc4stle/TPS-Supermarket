@@ -45,7 +45,7 @@ $modul = [
     ['MIS', 'Management Information', '📈', 'p', 'Dashboard kinerja perusahaan untuk manajer, dirangkum dari TPS, OAS, dan KMS.',
         $manajer ? [['Omzet 7 hari', ringkas($omzet7)], ['Peringatan aktif', (string) $nAlert], ['Halaman analitik', '11']] : [],
         'mis/index.php', $manajer, 'Khusus manajer'],
-    ['DSS', 'Decision Support', '🧭', 't', 'Pemilihan supplier terbaik dengan metode SAW. Aplikasi Flask terpisah (port ' . DSS_PORT . '), masuk otomatis lewat SSO.',
+    ['DSS', 'Decision Support', '🧭', 't', '6 kasus keputusan (supplier, restok, promo, bundling, pegawai terbaik, kasir per shift) dari data TPS, OAS, KMS, dan MIS. Aplikasi Flask terpisah (port ' . DSS_PORT . '), masuk otomatis lewat SSO.',
         $dssAngka, 'sso_dss.php', $bolehDss, 'Manajer & admin'],
 ];
 
@@ -84,7 +84,7 @@ echo hero('Lima modul, satu sistem 🛒', 'MartOffice menyatukan transaksi kasir
     <div><b>📋 OAS</b><small>mengatur tugas &amp; dokumen</small></div><span>→</span>
     <div><b>📚 KMS</b><small>menyimpan SOP &amp; pengetahuan</small></div><span>→</span>
     <div><b>📈 MIS</b><small>merangkum semuanya untuk manajer</small></div><span>→</span>
-    <div class="hl"><b>🧭 DSS</b><small>membantu memilih supplier terbaik</small></div>
+    <div class="hl"><b>🧭 DSS</b><small>6 kasus keputusan dari data TPS, OAS, KMS, MIS</small></div>
   </div>
   <p class="hint mb0" style="margin-top:12px">TPS, OAS, KMS, dan MIS memakai satu database MySQL. DSS adalah aplikasi Flask + SQLite terpisah di port <?= DSS_PORT ?> yang terhubung lewat <b>Single Sign-On</b> dan API bertanda tangan HMAC.</p>
 </div>

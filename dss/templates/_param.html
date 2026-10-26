@@ -1,0 +1,12 @@
+{# Form parameter kasus. Variabel: param_nama, param_isi = [(kunci, label, satuan, step, min, max)], st #}
+<section class="card">
+  <div class="card-h"><h3>⚙️ Parameter</h3>{% if not is_manajer %}<span class="hint">hanya manajer yang dapat mengubah</span>{% endif %}</div>
+  <form method="post" action="{{ url_for('simpan_pengaturan', nama=param_nama) }}" class="param-form">
+    <input type="hidden" name="_token" value="{{ csrf }}">
+    {% for kunci, label, satuan, step, mn, mx in param_isi %}
+      <label for="{{ kunci }}">{{ label }}</label>
+      <div class="param-in"><input id="{{ kunci }}" name="{{ kunci }}" type="number" value="{{ st[kunci]|mentah }}" step="{{ step }}" min="{{ mn }}" {% if mx %}max="{{ mx }}"{% endif %} {{ '' if is_manajer else 'disabled' }} required><span>{{ satuan }}</span></div>
+    {% endfor %}
+    {% if is_manajer %}<button class="sm">💾 Simpan &amp; hitung ulang</button>{% endif %}
+  </form>
+</section>

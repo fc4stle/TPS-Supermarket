@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% set judul = 'Rekomendasi Restok' %}
+{% set sub = 'Produk apa yang harus dipesan sekarang dan berapa banyak — dari penjualan TPS, peringatan stok MIS, dan supplier terpilih di DSS.' %}
+{% block isi %}
+{% set total_nilai = semua|sum(attribute='nilai_pesan') %}
+{% set total_unit = semua|sum(attribute='saran') %}
+<div class="kpis">
+  <a class="kpi r" href="{{ url_for('restok', status='r') }}"><div class="kpi-top"><span class="kpi-ic">⛔</span></div><small>Stok habis</small><strong>{{ hs.r }}</strong><em>harus dipesan hari ini</em></a>
+  <a class="kpi o" href="{{ url_for('restok', status='o') }}"><div class="kpi-top"><span class="kpi-ic">📣</span></div><small>Pesan sekarang</small><strong>{{ hs.o }}</strong><em>stok ≤ titik pesan ulang</em></a>
+  <a class="kpi y" href="{{ url_for('restok', status='y') }}"><div class="kpi-top"><span class="kpi-ic">⏳</span></div><small>Segera</small><strong>{{ hs.y }}</strong><em>mencapai ROP ≤ 3 hari</em></a>
+  <a class="kpi g" href="{{ url_for('restok', status='g') }}"><div class="kpi-top"><span class="kpi-ic">✅</span></div><small>Aman</small><strong>{{ hs.g }}</strong><em>{{ hs.n }} produk tidak terjual</em></a>
+  <div class="kpi b"><div class="kpi-top"><span class="kpi-ic">🧾</span></div><small>Total usulan pesanan</small><strong>{{ total_unit|angka }} unit</strong><em>≈ {{ total_nilai|rp }} (harga jual)</em></div>
+</div>
+
+<div class="grid g-side-r">
+  <div>
+    <section class="card tight">
+      <div class="card-h"><h3>📦 Status Stok &amp; Saran Pesan</h3>
+        <div class="chips">
+          <a class="chip {{ 'on' if not status and not kat }}" href="{{ url_for('restok') }}">Semua <small>{{ semua|length }}</small></a>
+          {% for t, l in [('r','Habis'),('o','Pesan sekarang'),('y','Segera'),('g','Aman'),('n','Tidak terjual')] %}
+            <a class="chip {{ 'on' if status == t }}" href="{{ url_for('restok', status=t, kategori=kat) }}">{{ l }} <small>{{ hs[t] }}</small></a>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="chips pad">
+        {% for k in kategori %}<a class="chip {{ 'on' if kat == k }}" href="{{ url_for('restok', kategori=k, status=status) }}">{{ k }}</a>{% endfor %}
+        {% if kat %}<a class="chip" href="{{ url_for('restok', status=status) }}">✕ semua kategori</a>{% endif %}
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Produk</th><th class="num">Stok</th><th class="num">Rata/hari<small class="block">30 hari TPS</small></th><th class="num">Lead<small class="block">supplier</small></th><th class="num">ROP<small class="block">target</small></th><th class="num">Tahan</th><th>Status</th><th class="num">Saran pesan</th></tr></thead>
+        <tbody>{% for r in rows %}
+          <tr class="{{ 'muted-row' if r.tone == 'n' }}">
+            <td class="pcell"><b>{{ r.ikon }} {{ r.nama }}</b><small class="block">{{ r.sku }} · {{ r.kategori }}</small>
+              <div class="flags">{% if r.mis %}<span class="badge src-mis" title="Muncul di Pusat Peringatan MIS">⚠ MIS {{ r.mis }}</span>{% endif %}
+              {% if r.mudah_rusak %}<span class="badge src-kms" title="SOP Kedaluwarsa & FIFO (KMS): siklus dibatasi {{ r.siklus|nilai }} hari">🍃 siklus {{ r.siklus|nilai }} hr</span>{% endif %}
+              {% if r.ditugaskan %}<span class="badge src-oas" title="Sudah ada tugas [DSS] di OAS yang belum selesai">📋 sudah ditugaskan</span>{% endif %}</div></td>
+            <td class="num"><b>{{ r.stok }}</b> <small>{{ r.satuan }}</small></td>
+            <td class="num">{{ r.rata|angka(1) }}</td>
+            <td class="num">{{ r.lead|nilai }} hari</td>
+            <td class="num">{{ r.rop|angka(1) }}<small class="block">{{ r.target|angka(0) }}</small></td>
+            <td class="num">{{ (r.tahan|angka(1) ~ ' hari') if r.tahan is not none else '–' }}</td>
+            <td><span class="badge {{ r.tone }}">{{ r.status }}</span>
+</td>
+            <td class="num">{% if r.saran %}<b class="saran">+{{ r.saran }}</b> <small>{{ r.satuan }}</small>{% else %}–{% endif %}</td>
+          </tr>{% else %}<tr><td colspan="8"><div class="empty sm">Tidak ada produk pada filter ini.</div></td></tr>{% endfor %}
+        </tbody>
+      </table></div>
+    </section>
+
+    <section class="card" id="simpan">
+      <div class="card-h"><h3>🧾 Draf Pemesanan per Supplier</h3><span class="hint">dikelompokkan menurut supplier juara SAW tiap kategori</span></div>
+      {% if draf %}
+      <div class="po-grid">
+      {% for kat_, d in draf.items() %}
+        <div class="po">
+          <div class="po-h"><b>🚚 {{ d.supplier or 'Supplier belum dipilih' }}</b><small>{{ kat_ }} · lead {{ d.lead|nilai }} hari</small></div>
+          <ul>{% for i in d.item %}<li><span>{{ i.ikon }} {{ i.nama }}</span><b>{{ i.saran }} {{ i.satuan }}</b></li>{% endfor %}</ul>
+          <div class="po-f">{{ d.item|sum(attribute='saran') }} unit · ≈ {{ d.item|sum(attribute='nilai_pesan')|rp }}</div>
+        </div>
+      {% endfor %}
+      </div>
+      {% if is_manajer %}
+      <form method="post" class="grid g2 mt">
+        <input type="hidden" name="_token" value="{{ csrf }}">
+        <div><label for="judul">Judul keputusan</label><input id="judul" name="judul" value="Rencana restok {{ hari_ini }}" maxlength="150"></div>
+        <div><label for="catatan">Catatan manajer</label><input id="catatan" name="catatan" placeholder="cth. kirim PO ke supplier sebelum jam 10.00"></div>
+        <div class="span2 form-actions"><button>💾 Simpan rencana restok ({{ total_unit }} unit)</button><span class="hint">Tersimpan di Riwayat Keputusan dan dapat dicetak.</span></div>
+      </form>
+      {% endif %}
+      {% if tugas %}<h4 class="sub-h">📋 Tugas restok [DSS] di OAS</h4>
+      <ul class="ref">{% for t in tugas[:5] %}<li><span class="badge {{ 'n' if t.status == 'selesai' else 'y' }}">{{ t.status }}</span> {{ t.judul }} <small>· {{ t.staff }} · tenggat {{ t.tenggat }}</small></li>{% endfor %}</ul>{% endif %}
+      {% else %}<div class="empty"><div class="empty-ic">✅</div><b>Semua stok aman</b><p>Belum ada produk yang perlu dipesan.</p></div>{% endif %}
+    </section>
+  </div>
+
+  <aside>
+    {% set param_nama = 'restok' %}
+    {% set param_isi = [('restok_siklus', 'Siklus pemesanan', 'hari', 1, 1, 60), ('restok_aman', 'Stok pengaman', 'hari', 0.5, 0, 30), ('restok_lead', 'Lead time bawaan', 'hari', 0.5, 0, 30), ('restok_segar', 'Siklus maks. produk segar', 'hari', 1, 1, 30)] %}
+    {% include '_param.html' %}
+    <section class="card formula">
+      <div class="card-h"><h3>📐 Rumus</h3></div>
+      <div class="f-box"><b>Rata-rata harian</b><span>d = terjual 30 hari ÷ 30</span><small>sumber: detail transaksi TPS</small></div>
+      <div class="f-box o"><b>Titik pesan ulang (ROP)</b><span>ROP = d × (L + SS)</span><small>L = lead time supplier juara SAW (kriteria Lama pengiriman), SS = {{ st.restok_aman|nilai }} hari</small></div>
+      <div class="f-box p"><b>Saran pesan</b><span>Q = d × (L + SS + {{ st.restok_siklus|nilai }}) − stok</span><small>dibulatkan ke atas; hanya untuk status Habis, Pesan sekarang, Segera. Kategori mudah rusak (risiko kedaluwarsa ≥ 4) memakai siklus maks. {{ st.restok_segar|nilai }} hari sesuai SOP Kedaluwarsa &amp; FIFO di KMS.</small></div>
+    </section>
+    {% include '_integrasi.html' %}
+  </aside>
+</div>
+{% endblock %}

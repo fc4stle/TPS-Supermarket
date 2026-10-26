@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% set judul = 'Paket Bundling' %}
+{% set sub = 'Produk apa yang sering dibeli bersama dan cocok dijual sebagai paket — analisis keranjang belanja dari transaksi TPS.' %}
+{% block isi %}
+{% set kuat = rows|selectattr('lift', 'gt', 1)|list %}
+<div class="kpis">
+  <div class="kpi b"><div class="kpi-top"><span class="kpi-ic">🧾</span></div><small>Transaksi dianalisis</small><strong>{{ n_trx|angka }}</strong><em>60 hari terakhir (TPS)</em></div>
+  <div class="kpi"><div class="kpi-top"><span class="kpi-ic">🔗</span></div><small>Pasangan produk</small><strong>{{ rows|length }}</strong><em>dibeli bersama ≥ 3 kali</em></div>
+  <div class="kpi y"><div class="kpi-top"><span class="kpi-ic">⚡</span></div><small>Lift &gt; 1</small><strong>{{ kuat|length }}</strong><em>saling mendorong pembelian</em></div>
+  <div class="kpi p"><div class="kpi-top"><span class="kpi-ic">🏷️</span></div><small>Diskon paket</small><strong>{{ st.bundling_diskon|nilai }}%</strong><em>dari harga normal</em></div>
+  <div class="kpi o"><div class="kpi-top"><span class="kpi-ic">🛍️</span></div><small>Rata-rata belanja (MIS)</small><strong>{{ rata|rp }}</strong><em>per struk, 30 hari</em></div>
+</div>
+
+<div class="grid g-side-r">
+  <div>
+    <form method="post" id="simpan">
+    <input type="hidden" name="_token" value="{{ csrf }}">
+    <section class="card tight">
+      <div class="card-h"><h3>🧺 Kandidat Paket (urut lift)</h3>{% if is_manajer %}<span class="hint">centang paket yang akan dijalankan</span>{% endif %}</div>
+      {% if rows %}
+      <div class="table-wrap"><table>
+        <thead><tr>{% if is_manajer %}<th></th>{% endif %}<th>Paket</th><th class="num">Dibeli bersama</th><th class="num">Support</th><th class="num">Conf.<small class="block">A→B · B→A</small></th><th class="num">Lift</th><th class="num">Harga paket<small class="block">normal → paket</small></th></tr></thead>
+        <tbody>{% for r in rows[:25] %}
+          <tr>
+            {% if is_manajer %}<td><input type="checkbox" name="pilih" value="{{ loop.index0 }}" {{ 'checked' if loop.index0 < 3 and r.lift > 1 }} aria-label="Pilih paket {{ loop.index }}"></td>{% endif %}
+            <td><b>{{ r.a.ikon }} {{ r.a.nama }} + {{ r.b.ikon }} {{ r.b.nama }}</b>
+              <small class="block">{{ r.a.kategori }}{{ (' × ' ~ r.b.kategori) if r.lintas else '' }}
+                {% if r.lambat %}<span class="badge y">bantu produk lambat laku</span>{% endif %}</small></td>
+            <td class="num">{{ r.bersama }}×</td>
+            <td class="num">{{ r.support|angka(2) }}%</td>
+            <td class="num">{{ r.conf_ab|angka(0) }}% · {{ r.conf_ba|angka(0) }}%</td>
+            <td class="num"><span class="lift {{ 'hi' if r.lift >= 1.5 else ('ok' if r.lift > 1 else 'lo') }}">{{ r.lift|angka(2) }}</span></td>
+            <td class="num nowrap"><s>{{ r.harga_normal|rp }}</s><b class="block">{{ r.harga_paket|rp }}</b>{% if rata %}<small class="block">{{ (r.harga_paket / rata * 100)|angka(0) }}% rata belanja</small>{% endif %}</td>
+          </tr>{% endfor %}
+        </tbody>
+      </table></div>
+      {% if rows|length > 25 %}<p class="hint pad">Menampilkan 25 dari {{ rows|length }} pasangan.</p>{% endif %}
+      {% else %}<div class="empty"><div class="empty-ic">🧺</div><b>Belum ada pasangan produk</b><p>Butuh transaksi dengan minimal dua produk berbeda.</p></div>{% endif %}
+    </section>
+    {% if is_manajer and rows %}
+    <section class="card">
+      <div class="card-h"><h3>💾 Simpan Keputusan Bundling</h3></div>
+      <div class="grid g2">
+        <div><label for="judul">Judul keputusan</label><input id="judul" name="judul" value="Paket bundling {{ hari_ini }}" maxlength="150"></div>
+        <div><label for="catatan">Catatan manajer</label><input id="catatan" name="catatan" placeholder="cth. pajang paket di rak depan kasir"></div>
+        <div class="span2 form-actions"><button>💾 Simpan paket yang dicentang</button></div>
+      </div>
+    </section>
+    {% endif %}
+    </form>
+  </div>
+
+  <aside>
+    {% set param_nama = 'bundling' %}
+    {% set param_isi = [('bundling_diskon', 'Diskon paket', '%', 1, 0, 50)] %}
+    {% include '_param.html' %}
+    <section class="card formula">
+      <div class="card-h"><h3>📐 Rumus</h3></div>
+      <div class="f-box"><b>Support</b><span>n(A∩B) ÷ N</span><small>seberapa sering pasangan muncul dari {{ n_trx|angka }} transaksi</small></div>
+      <div class="f-box o"><b>Confidence A → B</b><span>n(A∩B) ÷ n(A)</span><small>peluang membeli B bila sudah membeli A</small></div>
+      <div class="f-box p"><b>Lift</b><span>support(A∩B) ÷ (support A × support B)</span><small>&gt; 1 = saling mendorong · = 1 kebetulan · &lt; 1 saling menggantikan</small></div>
+    </section>
+    {% include '_integrasi.html' %}
+  </aside>
+</div>
+{% endblock %}

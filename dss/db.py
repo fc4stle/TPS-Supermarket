@@ -111,6 +111,53 @@ CREATE TABLE IF NOT EXISTS sinkron (
   ringkasan  TEXT,
   data_json  TEXT
 );
+
+-- Kriteria & bobot untuk kasus DSS lain yang memakai SAW (promo, pegawai)
+CREATE TABLE IF NOT EXISTS bobot_modul (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  modul      TEXT NOT NULL,
+  kode       TEXT NOT NULL,
+  nama       TEXT NOT NULL,
+  jenis      TEXT NOT NULL CHECK (jenis IN ('benefit','cost')),
+  bobot      REAL NOT NULL CHECK (bobot >= 0),
+  satuan     TEXT,
+  sumber     TEXT,
+  keterangan TEXT,
+  urutan     INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (modul, kode)
+);
+
+-- Parameter kasus DSS (restok, shift, bundling, promo) yang dapat diubah manajer
+CREATE TABLE IF NOT EXISTS pengaturan (
+  kunci      TEXT PRIMARY KEY,
+  nilai      REAL NOT NULL,
+  keterangan TEXT
+);
+
+-- Keputusan dari kasus DSS selain pemilihan supplier
+CREATE TABLE IF NOT EXISTS keputusan_lain (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  modul       TEXT NOT NULL,
+  judul       TEXT NOT NULL,
+  catatan     TEXT,
+  ringkasan   TEXT,
+  data_json   TEXT NOT NULL,
+  dibuat_oleh TEXT NOT NULL,
+  dibuat_pada TEXT NOT NULL
+);
+
+-- tindak lanjut keputusan yang dikirim balik ke OAS MartOffice (pengumuman / tugas / agenda)
+CREATE TABLE IF NOT EXISTS tindak_lanjut (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  sumber       TEXT NOT NULL CHECK (sumber IN ('supplier','lain')),
+  keputusan_id INTEGER NOT NULL,
+  jenis        TEXT NOT NULL,
+  ref_id       INTEGER,
+  judul        TEXT NOT NULL,
+  keterangan   TEXT,
+  dibuat_oleh  TEXT NOT NULL,
+  dibuat_pada  TEXT NOT NULL
+);
 """
 
 # Kriteria awal pemilihan supplier supermarket (konfigurasi, dapat diubah manajer)
@@ -120,6 +167,36 @@ KRITERIA_AWAL = [
     ("C3", "Ketepatan waktu kirim", "benefit", 20, "%", "Persentase pengiriman yang datang sesuai jadwal."),
     ("C4", "Barang rusak / retur", "cost", 15, "%", "Persentase barang yang rusak atau harus diretur."),
     ("C5", "Lama pengiriman", "cost", 15, "hari", "Lead time dari pemesanan sampai barang tiba."),
+]
+
+# Kriteria awal kasus DSS lain (kode, nama, jenis, bobot, satuan, sumber data, keterangan)
+BOBOT_MODUL_AWAL = {
+    "promo": [
+        ("P1", "Hari persediaan", "benefit", 30, "hari", "TPS", "Stok dibagi rata-rata penjualan harian. Makin lama stok bertahan, makin perlu dipromosikan."),
+        ("P2", "Penurunan penjualan", "benefit", 25, "%", "TPS · MIS", "Turunnya jumlah terjual 30 hari dibanding 30 hari sebelumnya (dihitung +1 agar tidak nol)."),
+        ("P3", "Risiko kedaluwarsa", "benefit", 25, "skor 1–5", "KMS", "Produk segar lebih cepat rusak (acuan SOP Pengecekan Tanggal Kedaluwarsa di KMS)."),
+        ("P4", "Kontribusi omzet", "cost", 20, "%", "TPS", "Porsi omzet 30 hari. Produk laris tidak perlu didiskon."),
+    ],
+    "pegawai": [
+        ("E1", "Transaksi dilayani", "benefit", 25, "transaksi/30 hari", "TPS", "Jumlah transaksi kasir 30 hari terakhir (dihitung +1 agar tidak nol)."),
+        ("E2", "Omzet dilayani", "benefit", 15, "Rp/30 hari", "TPS", "Total belanja yang dilayani 30 hari terakhir (dihitung +1 agar tidak nol)."),
+        ("E3", "Ketepatan waktu tugas", "benefit", 25, "%", "OAS", "Persentase tugas selesai sebelum tenggat (60 hari terakhir)."),
+        ("E4", "Tugas terlambat", "cost", 10, "tugas", "OAS", "Tugas aktif yang sudah melewati tenggat (dihitung +1 agar tidak nol)."),
+        ("E5", "Knowledge dibagikan", "benefit", 10, "artikel", "KMS", "Artikel knowledge published (dihitung +1 agar tidak nol)."),
+        ("E6", "Dinilai membantu", "benefit", 15, "feedback", "KMS", "Jumlah feedback 'membantu' pada knowledge yang ditulis (dihitung +1 agar tidak nol)."),
+    ],
+}
+
+PENGATURAN_AWAL = [
+    ("restok_siklus", 7, "Siklus pemesanan (hari): stok target cukup untuk sekian hari setelah barang datang"),
+    ("restok_aman", 2, "Stok pengaman (hari penjualan)"),
+    ("restok_lead", 2, "Lama pengiriman bawaan (hari) bila kategori belum punya supplier"),
+    ("restok_segar", 3, "Siklus maksimum produk mudah rusak (SOP Kedaluwarsa & FIFO di KMS)"),
+    ("promo_jumlah", 5, "Jumlah produk yang direkomendasikan untuk promo"),
+    ("promo_elastis", 1.5, "Elastisitas harga untuk simulasi: kenaikan % penjualan per 1% diskon"),
+    ("bundling_diskon", 10, "Potongan harga paket bundling (%)"),
+    ("shift_kasir", 3, "Jumlah kasir yang tersedia per hari"),
+    ("shift_batas", 14, "Jam pergantian shift pagi ke shift sore"),
 ]
 
 # Kategori produk MartOffice (dipakai bila TPS belum bisa dihubungi)
@@ -187,6 +264,12 @@ def init_db():
             "INSERT INTO kriteria (kode,nama,jenis,bobot,satuan,keterangan,urutan) VALUES (?,?,?,?,?,?,?)",
             [(k, n, j, b, s, ket, i) for i, (k, n, j, b, s, ket) in enumerate(KRITERIA_AWAL, 1)],
         )
+    for modul, daftar in BOBOT_MODUL_AWAL.items():
+        if con.execute("SELECT COUNT(*) FROM bobot_modul WHERE modul=?", (modul,)).fetchone()[0] == 0:
+            con.executemany(
+                "INSERT INTO bobot_modul (modul,kode,nama,jenis,bobot,satuan,sumber,keterangan,urutan) VALUES (?,?,?,?,?,?,?,?,?)",
+                [(modul, k, n, j, b, s_, sb, ket, i) for i, (k, n, j, b, s_, sb, ket) in enumerate(daftar, 1)])
+    con.executemany("INSERT OR IGNORE INTO pengaturan (kunci, nilai, keterangan) VALUES (?,?,?)", PENGATURAN_AWAL)
     if con.execute("SELECT COUNT(*) FROM kategori").fetchone()[0] == 0:
         con.executemany("INSERT INTO kategori (nama, ikon) VALUES (?,?)", KATEGORI_AWAL)
     con.commit()

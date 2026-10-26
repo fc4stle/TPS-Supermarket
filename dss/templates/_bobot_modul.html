@@ -1,0 +1,26 @@
+{# Editor kriteria & bobot untuk kasus DSS berbasis SAW (promo, pegawai). Variabel: krit, nama_modul #}
+{% set total = krit|sum(attribute='bobot') %}
+<section class="card">
+  <div class="card-h"><h3>⚖️ Kriteria, Jenis &amp; Bobot</h3><span class="badge {{ 'g' if total > 0 else 'r' }}" id="totalBadge">Total bobot {{ total|nilai }}</span></div>
+  <form method="post" action="{{ url_for('bobot_modul', nama=nama_modul) }}">
+    <input type="hidden" name="_token" value="{{ csrf }}">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Kode</th><th>Kriteria</th><th>Sumber</th><th style="width:140px">Jenis</th><th class="num" style="width:110px">Bobot</th><th class="num">w</th></tr></thead>
+      <tbody>{% for k in krit %}
+        <tr>
+          <td><code>{{ k.kode }}</code></td>
+          <td class="crit-name"><b>{{ k.nama }}</b> <small>({{ k.satuan }})</small><small class="block">{{ k.keterangan }}</small></td>
+          <td>{% for s in k.sumber.split(' · ') %}<span class="badge src-{{ s|lower }}">{{ s }}</span> {% endfor %}</td>
+          <td>{% if is_manajer %}<select name="jenis_{{ k.id }}" class="jenis-in {{ k.jenis }}"><option value="benefit" {{ 'selected' if k.jenis == 'benefit' }}>▲ Benefit</option><option value="cost" {{ 'selected' if k.jenis == 'cost' }}>▼ Cost</option></select>
+              {% elif k.jenis == 'benefit' %}<span class="badge">▲ benefit</span>{% else %}<span class="badge o">▼ cost</span>{% endif %}</td>
+          <td class="num">{% if is_manajer %}<input class="bobot-in" type="number" name="bobot_{{ k.id }}" value="{{ k.bobot|mentah }}" min="0" step="any" required>{% else %}<b>{{ k.bobot|nilai }}</b>{% endif %}</td>
+          <td class="num" data-w="{{ k.id }}">{{ (k.bobot / total if total else 0)|angka(2) }}</td>
+        </tr>{% endfor %}
+      </tbody>
+      <tfoot><tr><th colspan="4" class="right">Total</th><th class="num" id="totalCell">{{ total|nilai }}</th><th class="num">1,00</th></tr></tfoot>
+    </table></div>
+    <div class="wbar" id="wbar">{% for k in krit %}<i style="flex:{{ k.bobot }}" class="w{{ loop.index0 % 6 }}">{{ k.kode }}</i>{% endfor %}</div>
+    {% if is_manajer %}<div class="form-actions"><button id="btnBobot">💾 Simpan bobot &amp; jenis</button><span class="hint" id="bobotInfo"></span></div>
+    {% else %}<p class="hint">Bobot hanya dapat diubah oleh manajer.</p>{% endif %}
+  </form>
+</section>

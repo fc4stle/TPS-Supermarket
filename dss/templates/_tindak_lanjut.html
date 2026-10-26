@@ -1,0 +1,24 @@
+{# Tindak lanjut keputusan ke OAS. Variabel: usulan, tl, sumber, p #}
+<section class="card no-print tindak">
+  <div class="card-h"><h3>↩ Tindak Lanjut ke MartOffice (OAS)</h3><span class="hint">hasil dipantau MIS: penyelesaian tugas &amp; peringatan tugas terlambat</span></div>
+  {% if usulan %}
+  <div class="tla-grid">
+    {% for a in usulan %}
+      {% set sudah = tl|selectattr('judul', 'equalto', a.judul)|list %}
+      <div class="tla {{ 'done' if sudah }}">
+        <div class="tla-h"><b>{{ a.label }}</b><span class="badge {{ 'n' if sudah else 'b' }}">{{ a.jenis }}</span></div>
+        <p class="tla-j">{{ a.judul }}</p>
+        <small class="block">{% if a.jenis == 'tugas' %}untuk staf {{ a.jabatan }} · tenggat {{ a.tenggat }} · prioritas {{ a.prioritas }}{% elif a.jenis == 'agenda' %}mulai {{ a.mulai }} · untuk {{ a.untuk }}{% else %}tampil di OAS → Pengumuman{% endif %}</small>
+        {% if sudah %}<span class="badge">✓ terkirim {{ sudah[0].dibuat_pada|tgl }}{{ (' · ' ~ sudah[0].keterangan) if sudah[0].keterangan }}</span>
+        {% elif is_manajer %}
+          <form method="post" action="{{ url_for('kirim_tindak_lanjut', sumber=sumber, kid=p.id, kode=a.kode) }}"><input type="hidden" name="_token" value="{{ csrf }}"><button class="sm">Kirim ke OAS</button></form>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if tl %}
+  <ul class="ref mt">{% for t in tl %}<li><span class="badge src-oas">OAS</span> {{ t.jenis }} #{{ t.ref_id }} — {{ t.judul }} <small>· {{ t.dibuat_pada|tgl }} oleh {{ t.dibuat_oleh }}</small>
+    <a href="{{ home }}/oas/{{ 'tugas' if t.jenis == 'tugas' else ('agenda' if t.jenis == 'agenda' else 'pengumuman') }}.php" target="_blank">buka ↗</a></li>{% endfor %}</ul>
+  {% endif %}
+</section>

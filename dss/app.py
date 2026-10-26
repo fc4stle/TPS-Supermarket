@@ -21,6 +21,7 @@ from flask import (Flask, Response, abort, flash, g, jsonify, redirect,
 
 import config
 import db
+import modul
 import saw
 import sso
 
@@ -110,6 +111,7 @@ def inject():
         "hari_ini": f"{HARI[d.weekday()]}, {d.day} {BULAN[d.month]} {d.year}",
         "port": config.PORT,
         "IKON": db.IKON_KATEGORI,
+        "MODUL": MODUL,
     }
 
 
@@ -336,9 +338,9 @@ def api_ringkasan():
 # =====================================================================
 #  Halaman
 # =====================================================================
-@app.route("/")
+@app.route("/supplier/ringkasan")
 @login_wajib()
-def dashboard():
+def supplier_ringkasan():
     kats = daftar_kategori()
     juara = []
     for k in kats:
@@ -391,8 +393,8 @@ def dashboard():
     }
     terbaru = db.rows("""SELECT p.*, k.nama kategori, k.ikon FROM keputusan p JOIN kategori k ON k.id=p.kategori_id
                          ORDER BY p.id DESC LIMIT 5""")
-    return render_template("dashboard.html", juara=juara, mo=mo, prioritas=prioritas, langkah=langkah,
-                           stat=stat, terbaru=terbaru, active="dashboard")
+    return render_template("supplier_ringkasan.html", juara=juara, mo=mo, prioritas=prioritas, langkah=langkah,
+                           stat=stat, terbaru=terbaru, active="sup-ringkasan")
 
 
 # ---------------- Supplier ----------------
@@ -664,7 +666,13 @@ def keputusan():
     kid = request.args.get("kategori", type=int)
     sql = "SELECT p.*, k.nama kategori, k.ikon FROM keputusan p JOIN kategori k ON k.id=p.kategori_id"
     rows = db.rows(sql + (" WHERE p.kategori_id=?" if kid else "") + " ORDER BY p.id DESC", (kid,) if kid else ())
-    return render_template("keputusan.html", rows=rows, kats=daftar_kategori(), kid=kid, active="keputusan")
+    m = request.args.get("modul")
+    m = m if m in MODUL else None
+    lain = db.rows("SELECT * FROM keputusan_lain" + (" WHERE modul=?" if m else "") + " ORDER BY id DESC", (m,) if m else ())
+    if m and m != "supplier":
+        rows = []
+    return render_template("keputusan.html", rows=rows, lain=lain, kats=daftar_kategori(), kid=kid, modul_aktif=m,
+                           active="keputusan")
 
 
 def _keputusan(kid):
@@ -678,7 +686,9 @@ def _keputusan(kid):
 @login_wajib()
 def keputusan_detail(kid):
     p, bobot, hasil = _keputusan(kid)
-    return render_template("keputusan_detail.html", p=p, bobot=bobot, hasil=hasil, active="keputusan")
+    p2 = db.row("SELECT p.*, k.nama kategori FROM keputusan p JOIN kategori k ON k.id=p.kategori_id WHERE p.id=?", (kid,))
+    return render_template("keputusan_detail.html", p=p, bobot=bobot, hasil=hasil, active="keputusan",
+                           usulan=usulan_tindak("supplier", p2, None), tl=tindak_lanjut_ada("supplier", kid), sumber="supplier")
 
 
 @app.route("/keputusan/<int:kid>/csv")
@@ -703,6 +713,584 @@ def keputusan_hapus(kid):
     db.run("DELETE FROM keputusan WHERE id=?", (kid,))
     flash("ok", "Riwayat keputusan dihapus.")
     return redirect(url_for("keputusan"))
+
+
+# =====================================================================
+#  Kasus DSS lain: restok, promo, bundling, pegawai terbaik, kasir per shift
+# =====================================================================
+MODUL = {
+    "supplier": ("🚚", "Pemilihan Supplier", "SAW"),
+    "restok": ("📦", "Rekomendasi Restok", "Reorder point"),
+    "promo": ("🏷️", "Produk Promo", "SAW + what-if"),
+    "bundling": ("🧺", "Paket Bundling", "Analisis keranjang"),
+    "pegawai": ("🏅", "Pegawai Terbaik", "SAW"),
+    "shift": ("🕒", "Kasir per Shift", "Pola jam sibuk"),
+}
+PARAM_MODUL = {
+    "restok": ("restok_siklus", "restok_aman", "restok_lead", "restok_segar"),
+    "promo": ("promo_jumlah", "promo_elastis"),
+    "bundling": ("bundling_diskon",),
+    "shift": ("shift_kasir", "shift_batas"),
+}
+
+
+def pengaturan():
+    return {r["kunci"]: r["nilai"] for r in db.rows("SELECT kunci, nilai FROM pengaturan")}
+
+
+def kriteria_modul(nama):
+    return [dict(r) for r in db.rows("SELECT * FROM bobot_modul WHERE modul=? ORDER BY urutan, id", (nama,))]
+
+
+def juara_supplier_kategori():
+    """Juara SAW tiap kategori beserta lama pengirimannya (dipakai rekomendasi restok)."""
+    krit = daftar_kriteria()
+    k_lead = next((k for k in krit if "pengiriman" in k["nama"].lower()), None)
+    hasil = {}
+    for k in daftar_kategori():
+        _, _, nilai, h = data_saw(k["id"])
+        if h["ranking"]:
+            j = h["ranking"][0]
+            hasil[k["nama"]] = {"supplier": j["nama"], "v": j["v"], "kategori_id": k["id"],
+                                "lead": nilai.get((j["id"], k_lead["id"])) if k_lead else None}
+    return hasil
+
+
+def butuh_data():
+    mo = data_martoffice()
+    if not mo or "produk" not in mo:
+        mo = data_martoffice(paksa=True, pemicu="data rinci kasus DSS")
+    return mo if mo and "produk" in mo else None
+
+
+def simpan_keputusan_lain(nama_modul, judul, ringkasan, kolom, baris, parameter=None):
+    cur = db.run("""INSERT INTO keputusan_lain (modul,judul,catatan,ringkasan,data_json,dibuat_oleh,dibuat_pada)
+                    VALUES (?,?,?,?,?,?,?)""",
+                 (nama_modul, judul[:150], (request.form.get("catatan") or "").strip()[:1000], ringkasan,
+                  json.dumps({"kolom": kolom, "baris": baris, "parameter": parameter or {}}, ensure_ascii=False),
+                  nama_user(), db.sekarang()))
+    flash("ok", f"Keputusan disimpan: {ringkasan}")
+    return redirect(url_for("keputusan_lain_detail", kid=cur.lastrowid))
+
+
+def tren_transaksi_mis(mo):
+    """Perubahan jumlah transaksi 7 hari terakhir vs 7 hari sebelumnya dari mis_penjualan_harian (MIS)."""
+    h = {x["tanggal"]: x["transaksi"] for x in (mo.get("mis", {}).get("harian") or [])}
+    if not h:
+        return None
+    hari = [(datetime.now().date() - timedelta(days=i)).isoformat() for i in range(14)]  # hari tanpa transaksi dihitung 0
+    a, b = sum(h.get(t, 0) for t in hari[:7]), sum(h.get(t, 0) for t in hari[7:])
+    return round((a - b) / b * 100, 1) if b else None
+
+
+def teks_oas(mo):
+    """Judul + isi pengumuman dan agenda OAS 30 hari (untuk mendeteksi promo yang sudah berjalan)."""
+    o = mo.get("oas", {})
+    return [f"{x['judul']} {x.get('isi', '')}" for x in o.get("pengumuman", [])] + \
+           [f"{x['judul']} {x.get('deskripsi', '')}" for x in o.get("agenda", [])]
+
+
+def tugas_dss_aktif(mo):
+    return [t["judul"] + " " + t.get("deskripsi", "") for t in mo.get("oas", {}).get("tugas_dss", []) if t["status"] != "selesai"]
+
+
+def artikel_kms(mo, *kata):
+    return [a for a in mo.get("kms", {}).get("artikel", []) if any(k in a["judul"].lower() for k in kata)]
+
+
+def tindak_lanjut_ada(sumber, kid):
+    return db.rows("SELECT * FROM tindak_lanjut WHERE sumber=? AND keputusan_id=? ORDER BY id", (sumber, kid))
+
+
+def integrasi_kasus(nama, mo):
+    """
+    Peta data yang dipakai (masuk) dan dihasilkan (keluar) setiap kasus terhadap TPS, OAS, KMS, dan MIS.
+    Dipakai kartu 'Terhubung dengan MartOffice' di tiap halaman dan matriks di Pusat Keputusan.
+    """
+    mo = mo or {}
+    mis, oas = mo.get("mis", {}), mo.get("oas", {})
+    n_tl = {r["modul"]: r["n"] for r in db.rows("""SELECT k.modul, COUNT(*) n FROM tindak_lanjut t JOIN keputusan_lain k
+                                                   ON t.sumber='lain' AND k.id=t.keputusan_id GROUP BY k.modul""")}
+    n_tl["supplier"] = db.val("SELECT COUNT(*) FROM tindak_lanjut WHERE sumber='supplier'")
+    judul = lambda xs: ", ".join(a["judul"] for a in xs[:2]) or "–"
+    peta = {
+        "supplier": {
+            "TPS": "kategori produk, omzet & stok menipis per kategori",
+            "OAS": f"dokumen pemasok ({judul([d for d in oas.get('dokumen', []) if 'pemasok' in d['judul'].lower() or 'supplier' in d['judul'].lower()])}) sebagai bukti penilaian",
+            "KMS": f"SOP penerimaan barang & retur ({judul(artikel_kms(mo, 'retur', 'penerimaan', 'fifo'))})",
+            "MIS": f"{len(mis.get('peringatan_stok', []))} peringatan stok untuk prioritas kategori",
+        },
+        "restok": {
+            "TPS": "stok & penjualan 30 hari per produk",
+            "OAS": f"tugas [DSS] di OAS yang belum selesai ({len(tugas_dss_aktif(mo))} aktif) → produk yang sudah ditugaskan ditandai agar tidak dipesan dobel",
+            "KMS": f"SOP kedaluwarsa & FIFO → siklus produk mudah rusak dibatasi ({judul(artikel_kms(mo, 'kedaluwarsa', 'fifo'))})",
+            "MIS": f"{len(mis.get('produk_peringatan', []))} produk di Pusat Peringatan MIS ditandai ⚠",
+        },
+        "promo": {
+            "TPS": "stok, penjualan 30 hari & 30 hari sebelumnya",
+            "OAS": "pengumuman/agenda promo 30 hari → kategori yang sudah dipromosikan ditandai",
+            "KMS": f"risiko kedaluwarsa per kategori ({judul(artikel_kms(mo, 'kedaluwarsa', 'label harga'))})",
+            "MIS": f"omzet toko 30 hari {f_rp(mis.get('omzet_30'))} sebagai dasar kontribusi omzet (P4)",
+        },
+        "bundling": {
+            "TPS": f"{mo.get('keranjang', {}).get('transaksi', 0)} struk belanja (pasangan produk)",
+            "OAS": "pengumuman & tugas display paket dikirim setelah keputusan",
+            "KMS": f"ide bundling ({judul(artikel_kms(mo, 'bundling', 'display'))})",
+            "MIS": f"rata-rata belanja {f_rp(mis.get('rata_belanja_30'))} → paket dibandingkan dengan nilai keranjang",
+        },
+        "pegawai": {
+            "TPS": "transaksi & omzet per kasir 30 hari",
+            "OAS": "tugas selesai, tepat waktu, terlambat (60 hari)",
+            "KMS": "artikel yang ditulis & dinilai membantu",
+            "MIS": f"porsi omzet tiap pegawai terhadap omzet toko {f_rp(mis.get('omzet_30'))}",
+        },
+        "shift": {
+            "TPS": "jam setiap transaksi 8 minggu",
+            "OAS": f"dokumen jadwal shift & agenda ({judul([d for d in oas.get('dokumen', []) if 'shift' in d['judul'].lower()])})",
+            "KMS": f"aturan shift & kas kasir ({judul(artikel_kms(mo, 'shift', 'kas kasir'))})",
+            "MIS": "tren transaksi 7 hari (mis_penjualan_harian) → saran kasir cadangan",
+        },
+    }
+    keluar = {
+        "supplier": "pengumuman supplier terpilih + tugas penerimaan barang (OAS) · panel MIS",
+        "restok": "tugas pemesanan untuk staf gudang (OAS) · panel MIS",
+        "promo": "pengumuman promo + tugas pasang label (OAS) · panel MIS",
+        "bundling": "pengumuman paket + tugas display (OAS) · panel MIS",
+        "pegawai": "pengumuman pegawai terbaik (OAS) · panel MIS",
+        "shift": "pengumuman jadwal + agenda briefing kasir (OAS) · panel MIS",
+    }
+    return {"masuk": peta[nama], "keluar": keluar[nama], "terkirim": n_tl.get(nama, 0)}
+
+
+def usulan_tindak(modul_, p, d):
+    """Tindak lanjut yang dapat dikirim ke OAS untuk sebuah keputusan. p = baris keputusan, d = data_json."""
+    besok = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    lusa = (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d")
+    baris = d.get("baris", []) if d else []
+    if modul_ == "supplier":
+        return [
+            {"kode": "umumkan", "jenis": "pengumuman", "label": "📢 Umumkan supplier terpilih", "judul": f"Supplier {p['kategori']}: {p['pemenang_nama']}",
+             "isi": f"Berdasarkan DSS (SAW), {p['pemenang_nama']} dipilih sebagai supplier {p['kategori']}. {p['catatan'] or ''}".strip()},
+            {"kode": "terima", "jenis": "tugas", "label": "📋 Tugas: siapkan penerimaan barang", "jabatan": "gudang", "tenggat": lusa, "prioritas": "sedang",
+             "judul": f"Siapkan penerimaan barang dari {p['pemenang_nama']}", "isi": f"Supplier baru kategori {p['kategori']}. Ikuti SOP penerimaan barang di KMS."},
+        ]
+    if modul_ == "restok":
+        daftar = "\n".join(f"- {b[1]}: {b[5]} {b[6]} (supplier {b[7]})" for b in baris)
+        return [{"kode": "pesan", "jenis": "tugas", "label": "📋 Tugas: pesan barang ke supplier", "jabatan": "gudang", "tenggat": besok, "prioritas": "tinggi",
+                 "judul": f"Restok {len(baris)} produk: " + ", ".join(b[1] for b in baris[:3]) + ("…" if len(baris) > 3 else ""),
+                 "isi": "Rencana restok dari DSS:\n" + daftar + "\nTerapkan FIFO saat barang diterima (KMS)."}]
+    if modul_ == "promo":
+        nama = ", ".join(b[2] for b in baris)
+        diskon = (d.get("parameter") or {}).get("diskon", 15)
+        return [
+            {"kode": "umumkan", "jenis": "pengumuman", "label": "📢 Umumkan promo ke pegawai", "penting": True,
+             "judul": f"Promo diskon {diskon:g}%: " + ", ".join(b[2] for b in baris[:2]) + ("…" if len(baris) > 2 else ""),
+             "isi": f"Produk promo hasil DSS: {nama}. Diskon {diskon:g}%. Tawarkan ke pelanggan saat di kasir."},
+            {"kode": "label", "jenis": "tugas", "label": "📋 Tugas: pasang label harga promo", "jabatan": "toko", "tenggat": besok, "prioritas": "tinggi",
+             "judul": f"Pasang label promo {diskon:g}% ({len(baris)} produk)", "isi": f"Produk: {nama}. Ikuti panduan 'Cara Memasang Label Harga Promo' di KMS."},
+        ]
+    if modul_ == "bundling":
+        paket = "; ".join(f"{b[0]} = Rp{b[4]:,}".replace(",", ".") for b in baris)
+        return [
+            {"kode": "umumkan", "jenis": "pengumuman", "label": "📢 Umumkan paket bundling", "judul": f"Paket hemat baru ({len(baris)} paket)",
+             "isi": f"Paket bundling hasil DSS: {paket}."},
+            {"kode": "display", "jenis": "tugas", "label": "📋 Tugas: siapkan display paket", "jabatan": "toko", "tenggat": lusa, "prioritas": "sedang",
+             "judul": f"Siapkan display {len(baris)} paket bundling", "isi": f"Susun paket: {paket}. Letakkan dekat kasir."},
+        ]
+    if modul_ == "pegawai":
+        juara = baris[0][1] if baris else "-"
+        return [{"kode": "umumkan", "jenis": "pengumuman", "label": "📢 Umumkan pegawai terbaik", "penting": True,
+                 "judul": f"Pegawai terbaik: {juara}", "isi": f"Selamat kepada {juara} sebagai pegawai terbaik periode ini berdasarkan data TPS, OAS, dan KMS. {p['catatan'] or ''}".strip()}]
+    if modul_ == "shift":
+        jadwal = "\n".join(f"- {b[0]} · {b[1]}: {b[2]} kasir ({b[3]})" for b in baris)
+        return [
+            {"kode": "umumkan", "jenis": "pengumuman", "label": "📢 Umumkan jadwal kasir", "judul": "Jadwal kasir baru", "isi": "Jadwal kasir hasil DSS:\n" + jadwal},
+            {"kode": "briefing", "jenis": "agenda", "label": "🗓️ Agenda: briefing kasir", "mulai": besok + " 07:30", "untuk": "staff",
+             "judul": "Briefing jadwal kasir baru", "isi": "Pembahasan jadwal shift kasir dari DSS. Baca juga 'Aturan Tukar Shift dan Izin' di KMS."},
+        ]
+    return []
+
+
+@app.route("/tindak-lanjut/<sumber>/<int:kid>/<kode>", methods=["POST"])
+@login_wajib("manajer")
+def kirim_tindak_lanjut(sumber, kid, kode):
+    if sumber == "supplier":
+        p = db.row("SELECT p.*, k.nama kategori FROM keputusan p JOIN kategori k ON k.id=p.kategori_id WHERE p.id=?", (kid,))
+        modul_, d, balik = "supplier", None, url_for("keputusan_detail", kid=kid)
+    elif sumber == "lain":
+        p = db.row("SELECT * FROM keputusan_lain WHERE id=?", (kid,))
+        modul_, d, balik = (p["modul"] if p else None), (json.loads(p["data_json"]) if p else None), url_for("keputusan_lain_detail", kid=kid)
+    else:
+        abort(404)
+    if not p:
+        abort(404)
+    aksi = next((a for a in usulan_tindak(modul_, p, d) if a["kode"] == kode), None)
+    if not aksi:
+        abort(404)
+    if db.row("SELECT id FROM tindak_lanjut WHERE sumber=? AND keputusan_id=? AND jenis=? AND judul=?", (sumber, kid, aksi["jenis"], aksi["judul"])):
+        flash("info", "Tindak lanjut ini sudah pernah dikirim ke OAS.")
+        return redirect(balik)
+    isi = {k: v for k, v in aksi.items() if k not in ("kode", "label")}
+    isi["oleh"] = (session.get("user") or {}).get("username")
+    hasil, err = sso.kirim_martoffice(isi, (session.get("user") or {}).get("home"))
+    if not hasil:
+        flash("err", f"Gagal mengirim ke MartOffice: {err}. Pastikan Apache XAMPP menyala.")
+        return redirect(balik)
+    ket = f"untuk {hasil['staff']}" if hasil.get("staff") else ""
+    db.run("""INSERT INTO tindak_lanjut (sumber,keputusan_id,jenis,ref_id,judul,keterangan,dibuat_oleh,dibuat_pada)
+              VALUES (?,?,?,?,?,?,?,?)""", (sumber, kid, aksi["jenis"], hasil.get("id"), aksi["judul"], ket, nama_user(), db.sekarang()))
+    data_martoffice(paksa=True, pemicu="tindak lanjut ke OAS")
+    flash("ok", f"Terkirim ke OAS sebagai {aksi['jenis']} {ket}. Staf melihatnya di MartOffice dan MIS memantau penyelesaiannya.")
+    return redirect(balik)
+
+
+@app.route("/bobot/<nama>", methods=["POST"])
+@login_wajib("manajer")
+def bobot_modul(nama):
+    krit = kriteria_modul(nama)
+    if not krit:
+        abort(404)
+    baru = {}
+    try:
+        for k in krit:
+            b = float((request.form.get(f"bobot_{k['id']}") or "").replace(",", "."))
+            j = request.form.get(f"jenis_{k['id']}", k["jenis"])
+            if b < 0 or j not in ("benefit", "cost"):
+                raise ValueError
+            baru[k["id"]] = (b, j)
+    except ValueError:
+        flash("err", "Bobot harus angka 0 atau lebih dan jenis harus benefit atau cost.")
+        return redirect(request.referrer or url_for("dashboard"))
+    if sum(b for b, _ in baru.values()) <= 0:
+        flash("err", "Total bobot harus lebih dari 0.")
+        return redirect(request.referrer or url_for("dashboard"))
+    for kid, (b, j) in baru.items():
+        db.run("UPDATE bobot_modul SET bobot=?, jenis=? WHERE id=?", (b, j, kid))
+    flash("ok", "Bobot dan jenis kriteria disimpan. Ranking otomatis menyesuaikan.")
+    return redirect(request.referrer or url_for("dashboard"))
+
+
+@app.route("/pengaturan/<nama>", methods=["POST"])
+@login_wajib("manajer")
+def simpan_pengaturan(nama):
+    if nama not in PARAM_MODUL:
+        abort(404)
+    for kunci in PARAM_MODUL[nama]:
+        raw = (request.form.get(kunci) or "").replace(",", ".").strip()
+        try:
+            v = float(raw)
+            if v < 0 or (kunci == "shift_batas" and not 8 <= v <= 20) or (kunci == "shift_kasir" and not 2 <= v <= 20):
+                raise ValueError
+        except ValueError:
+            flash("err", f"Nilai '{raw}' tidak valid untuk {kunci}.")
+            return redirect(request.referrer or url_for("dashboard"))
+        db.run("UPDATE pengaturan SET nilai=? WHERE kunci=?", (v, kunci))
+    flash("ok", "Parameter disimpan. Hasil dihitung ulang.")
+    return redirect(request.referrer or url_for("dashboard"))
+
+
+def _data_restok(mo):
+    st = pengaturan()
+    mis_ids = {x["id"]: x["level"] for x in mo.get("mis", {}).get("produk_peringatan", [])}
+    return modul.hitung_restok(mo["produk"], juara_supplier_kategori(), st["restok_siklus"], st["restok_aman"], st["restok_lead"],
+                               st.get("restok_segar", 3), mis_ids, tugas_dss_aktif(mo)), st
+
+
+@app.route("/restok", methods=["GET", "POST"])
+@login_wajib()
+def restok():
+    mo = butuh_data()
+    if not mo:
+        return render_template("modul_kosong.html", judul_modul="Rekomendasi Restok", active="restok")
+    rows, st = _data_restok(mo)
+    if request.method == "POST":
+        if session["user"]["role"] != "manajer":
+            flash("err", "Hanya manajer yang dapat menyimpan keputusan.")
+            return redirect(url_for("restok"))
+        pesan = [r for r in rows if r["saran"] > 0]
+        if not pesan:
+            flash("info", "Tidak ada produk yang perlu dipesan saat ini.")
+            return redirect(url_for("restok"))
+        baris = [[r["sku"], r["nama"], r["kategori"], r["stok"], r["status"], r["saran"], r["satuan"], r["supplier"] or "–"] for r in pesan]
+        return simpan_keputusan_lain("restok", request.form.get("judul") or f"Rencana restok {hari_ini_teks()}",
+                                     f"{len(pesan)} produk dipesan, total {sum(r['saran'] for r in pesan)} unit",
+                                     ["SKU", "Produk", "Kategori", "Stok", "Status", "Pesan", "Satuan", "Supplier"], baris,
+                                     {k: st[k] for k in PARAM_MODUL["restok"]})
+    status = request.args.get("status")
+    kat = request.args.get("kategori")
+    tampil = [r for r in rows if (not status or r["tone"] == status) and (not kat or r["kategori"] == kat)]
+    draf = {}
+    for r in rows:
+        if r["saran"] > 0:
+            draf.setdefault(r["kategori"], {"supplier": r["supplier"], "lead": r["lead"], "item": []})["item"].append(r)
+    hitung_status = {t: sum(1 for r in rows if r["tone"] == t) for t in ("r", "o", "y", "g", "n")}
+    return render_template("restok.html", rows=tampil, semua=rows, draf=draf, st=st, hs=hitung_status, status=status, kat=kat,
+                           kategori=sorted({r["kategori"] for r in rows}), mo=mo, integ=integrasi_kasus("restok", mo),
+                           tugas=mo.get("oas", {}).get("tugas_dss", []), artikel=artikel_kms(mo, "kedaluwarsa", "fifo", "stok"), active="restok")
+
+
+def _data_promo(mo):
+    krit = kriteria_modul("promo")
+    h, info = modul.hitung_promo(mo["produk"], krit, mo.get("mis", {}).get("omzet_30"))
+    teks = [t for t in teks_oas(mo) if "promo" in t.lower() or "diskon" in t.lower()]
+    aktif = modul.kategori_disebut(teks, {p["kategori"] for p in mo["produk"]})
+    gabung = " ".join(teks).lower()
+    for v in info.values():  # sudah dipromosikan bila produk atau kategorinya disebut di pengumuman/agenda promo OAS
+        v["promo_oas"] = v["kategori"] in aktif or v["nama"].lower() in gabung
+    return krit, h, info
+
+
+@app.route("/promo", methods=["GET", "POST"])
+@login_wajib()
+def promo():
+    mo = butuh_data()
+    if not mo:
+        return render_template("modul_kosong.html", judul_modul="Produk Promo", active="promo")
+    krit, h, info = _data_promo(mo)
+    st = pengaturan()
+    n = int(st["promo_jumlah"])
+    if request.method == "POST":
+        if session["user"]["role"] != "manajer":
+            flash("err", "Hanya manajer yang dapat menyimpan keputusan.")
+            return redirect(url_for("promo"))
+        try:
+            diskon = float(request.form.get("diskon", "15"))
+        except ValueError:
+            diskon = 15
+        top = h["ranking"][:n]
+        baris = [[r["rank"], r["kode"], r["nama"], info[r["id"]]["kategori"], f"{r['v'] * 100:.2f}",
+                  f"{diskon:g}%", info[r["id"]]["stok"]] for r in top]
+        return simpan_keputusan_lain("promo", request.form.get("judul") or f"Produk promo {hari_ini_teks()}",
+                                     f"{len(top)} produk promo, diskon {diskon:g}% · teratas {top[0]['nama']}" if top else "Tidak ada produk",
+                                     ["Rank", "SKU", "Produk", "Kategori", "Skor", "Diskon", "Stok"], baris,
+                                     {"diskon": diskon, "bobot": {k["kode"]: k["bobot"] for k in krit}})
+    sim = [{"id": r["id"], "nama": r["nama"], "harga": info[r["id"]]["harga"], "stok": info[r["id"]]["stok"],
+            "terjual_30": info[r["id"]]["terjual_30"], "satuan": info[r["id"]]["satuan"]} for r in h["ranking"]]
+    artikel = [a for a in mo["kms"]["artikel"] if any(w in a["judul"].lower() for w in ("kedaluwarsa", "bundling", "promo", "fifo"))]
+    promo_oas = [x for x in mo.get("oas", {}).get("pengumuman", []) + mo.get("oas", {}).get("agenda", []) if "promo" in x["judul"].lower()]
+    return render_template("promo.html", krit=krit, h=h, info=info, n=n, st=st, sim=sim, artikel=artikel, mo=mo, promo_oas=promo_oas,
+                           integ=integrasi_kasus("promo", mo), risiko=modul.RISIKO_KEDALUWARSA, active="promo", nama_modul="promo")
+
+
+@app.route("/bundling", methods=["GET", "POST"])
+@login_wajib()
+def bundling():
+    mo = butuh_data()
+    if not mo:
+        return render_template("modul_kosong.html", judul_modul="Paket Bundling", active="bundling")
+    st = pengaturan()
+    _, hp, _ = _data_promo(mo)
+    lambat = {r["id"] for r in hp["ranking"][:int(st["promo_jumlah"])]}
+    rows = modul.hitung_bundling(mo["produk"], mo["keranjang"], st["bundling_diskon"], lambat)
+    if request.method == "POST":
+        if session["user"]["role"] != "manajer":
+            flash("err", "Hanya manajer yang dapat menyimpan keputusan.")
+            return redirect(url_for("bundling"))
+        pilih = [int(i) for i in request.form.getlist("pilih") if i.isdigit()]
+        dipilih = [rows[i] for i in pilih if 0 <= i < len(rows)]
+        if not dipilih:
+            flash("err", "Centang minimal satu paket bundling.")
+            return redirect(url_for("bundling"))
+        baris = [[f"{r['a']['nama']} + {r['b']['nama']}", r["bersama"], f"{r['lift']:.2f}", r["harga_normal"], r["harga_paket"]] for r in dipilih]
+        return simpan_keputusan_lain("bundling", request.form.get("judul") or f"Paket bundling {hari_ini_teks()}",
+                                     f"{len(dipilih)} paket bundling · {dipilih[0]['a']['nama']} + {dipilih[0]['b']['nama']}",
+                                     ["Paket", "Dibeli bersama", "Lift", "Harga normal", "Harga paket"], baris,
+                                     {"diskon": st["bundling_diskon"]})
+    artikel = [a for a in mo["kms"]["artikel"] if "bundling" in a["judul"].lower()]
+    return render_template("bundling.html", rows=rows, st=st, n_trx=mo["keranjang"]["transaksi"], artikel=artikel, mo=mo,
+                           rata=mo.get("mis", {}).get("rata_belanja_30") or 0, integ=integrasi_kasus("bundling", mo), active="bundling")
+
+
+def _data_pegawai(mo):
+    krit = kriteria_modul("pegawai")
+    h, info = modul.hitung_pegawai(mo["pegawai"], krit)
+    return krit, h, info
+
+
+@app.route("/pegawai", methods=["GET", "POST"])
+@login_wajib()
+def pegawai():
+    mo = butuh_data()
+    if not mo:
+        return render_template("modul_kosong.html", judul_modul="Pegawai Terbaik", active="pegawai")
+    krit, h, info = _data_pegawai(mo)
+    if request.method == "POST":
+        if session["user"]["role"] != "manajer":
+            flash("err", "Hanya manajer yang dapat menyimpan keputusan.")
+            return redirect(url_for("pegawai"))
+        if not h["ranking"]:
+            flash("err", "Belum ada data pegawai.")
+            return redirect(url_for("pegawai"))
+        baris = [[r["rank"], r["nama"], info[r["id"]]["jabatan"], f"{r['v'] * 100:.2f}"] for r in h["ranking"]]
+        return simpan_keputusan_lain("pegawai", request.form.get("judul") or f"Pegawai terbaik {hari_ini_teks()}",
+                                     f"Pegawai terbaik: {h['ranking'][0]['nama']} (skor {h['ranking'][0]['v'] * 100:.2f})",
+                                     ["Rank", "Pegawai", "Jabatan", "Skor"], baris, {"bobot": {k["kode"]: k["bobot"] for k in krit}})
+    omzet_toko = mo.get("mis", {}).get("omzet_30") or 0
+    for g in info.values():
+        g["porsi"] = g["omzet"] / omzet_toko * 100 if omzet_toko else None
+    return render_template("pegawai.html", krit=krit, h=h, info=info, mo=mo, omzet_toko=omzet_toko,
+                           integ=integrasi_kasus("pegawai", mo), active="pegawai", nama_modul="pegawai")
+
+
+def _data_shift(mo):
+    st = pengaturan()
+    _, hp, _ = _data_pegawai(mo)
+    peta = {g["id"]: g for g in mo["pegawai"]}
+    kasir = [peta[r["id"]] for r in hp["ranking"] if peta[r["id"]]["transaksi"] > 0]
+    return modul.hitung_shift(mo["jam"], kasir, int(st["shift_kasir"]), int(st["shift_batas"]), tren=tren_transaksi_mis(mo)), st, kasir
+
+
+@app.route("/shift", methods=["GET", "POST"])
+@login_wajib()
+def shift():
+    mo = butuh_data()
+    if not mo:
+        return render_template("modul_kosong.html", judul_modul="Kasir per Shift", active="shift")
+    hs, st, kasir = _data_shift(mo)
+    if request.method == "POST":
+        if session["user"]["role"] != "manajer":
+            flash("err", "Hanya manajer yang dapat menyimpan keputusan.")
+            return redirect(url_for("shift"))
+        b = hs["batas"]
+        baris = []
+        for r in (hs["kerja"], hs["libur"]):
+            baris.append([r["label"], f"Pagi (buka–{b:02d}.00)", r["kasir_pagi"], ", ".join(r["nama_pagi"])])
+            baris.append([r["label"], f"Sore ({b:02d}.00–tutup)", r["kasir_sore"], ", ".join(r["nama_sore"])])
+        return simpan_keputusan_lain("shift", request.form.get("judul") or f"Jadwal kasir {hari_ini_teks()}",
+                                     f"{hs['kasir']} kasir/hari · hari kerja {hs['kerja']['kasir_pagi']} pagi + {hs['kerja']['kasir_sore']} sore",
+                                     ["Hari", "Shift", "Jumlah kasir", "Usulan nama"], baris, {"kasir": hs["kasir"], "batas": b})
+    dok = [d for d in mo["oas"]["dokumen"] if "shift" in d["judul"].lower()]
+    return render_template("shift.html", hs=hs, st=st, kasir=kasir, dok=dok, mo=mo, artikel=artikel_kms(mo, "shift", "kas kasir", "kasir"),
+                           agenda=mo.get("oas", {}).get("agenda", []), integ=integrasi_kasus("shift", mo), active="shift")
+
+
+def hari_ini_teks():
+    d = datetime.now()
+    return f"{d.day} {BULAN[d.month]} {d.year}"
+
+
+@app.route("/keputusan/lain/<int:kid>")
+@login_wajib()
+def keputusan_lain_detail(kid):
+    p = db.row("SELECT * FROM keputusan_lain WHERE id=?", (kid,))
+    if not p:
+        abort(404)
+    d = json.loads(p["data_json"])
+    return render_template("keputusan_lain.html", p=p, d=d, info=MODUL.get(p["modul"]), active="keputusan",
+                           usulan=usulan_tindak(p["modul"], p, d), tl=tindak_lanjut_ada("lain", kid), sumber="lain")
+
+
+@app.route("/keputusan/lain/<int:kid>/hapus", methods=["POST"])
+@login_wajib("manajer")
+def keputusan_lain_hapus(kid):
+    db.run("DELETE FROM keputusan_lain WHERE id=?", (kid,))
+    flash("ok", "Riwayat keputusan dihapus.")
+    return redirect(url_for("keputusan"))
+
+
+# ---------------- Alternatif kasus & hasil perhitungan ----------------
+ALTERNATIF = {
+    "supplier": {"masalah": "Memilih supplier terbaik untuk setiap kategori produk dari beberapa calon supplier.",
+                 "pengambil": "Manajer toko", "jenis": "Semi-terstruktur · pemilihan alternatif",
+                 "rumus": ["r = x / max (benefit) · r = min / x (cost)", "V = Σ wⱼ · rᵢⱼ · skor = 100 × V"],
+                 "kriteria": "C1 Harga (cost), C2 Kualitas (benefit), C3 Ketepatan kirim (benefit), C4 Lama pengiriman (cost), C5 Retur (cost)"},
+    "restok": {"masalah": "Menentukan produk yang harus dipesan sekarang dan jumlah pesanannya agar tidak kehabisan stok.",
+               "pengambil": "Manajer toko / staf gudang", "jenis": "Terstruktur · perencanaan persediaan",
+               "rumus": ["d = terjual 30 hari ÷ 30", "ROP = d × (L + SS)", "Q = d × (L + SS + siklus) − stok"],
+               "kriteria": "L dari supplier juara kasus 1, SS = stok pengaman, siklus produk segar dibatasi SOP KMS"},
+    "promo": {"masalah": "Memilih produk yang paling perlu didiskon dan memperkirakan dampak diskon terhadap penjualan dan omzet.",
+              "pengambil": "Manajer toko", "jenis": "Semi-terstruktur · pemilihan + simulasi what-if",
+              "rumus": ["SAW atas P1–P4 (V = Σ w · r)", "jual promo = d × (1 + e × diskon)", "omzet = min(stok, jual × hari) × harga promo"],
+              "kriteria": "P1 Hari persediaan (benefit), P2 Penurunan penjualan (benefit), P3 Risiko kedaluwarsa (benefit), P4 Kontribusi omzet (cost)"},
+    "bundling": {"masalah": "Menemukan pasangan produk yang sering dibeli bersama untuk dijual sebagai paket hemat.",
+                 "pengambil": "Manajer toko", "jenis": "Semi-terstruktur · analisis keranjang belanja",
+                 "rumus": ["support = n(A∩B) ÷ N", "confidence A→B = n(A∩B) ÷ n(A)", "lift = support(A∩B) ÷ (support A × support B)"],
+                 "kriteria": "Pasangan dengan lift > 1 (saling mendorong pembelian), diurutkan dari lift tertinggi"},
+    "pegawai": {"masalah": "Menentukan pegawai dengan kinerja terbaik secara objektif dari data kerja, bukan penilaian subjektif.",
+                "pengambil": "Manajer toko", "jenis": "Semi-terstruktur · penilaian kinerja",
+                "rumus": ["r = x / max (benefit) · r = min / x (cost)", "V = Σ wⱼ · rᵢⱼ · skor = 100 × V"],
+                "kriteria": "E1 Transaksi, E2 Omzet, E3 Ketepatan waktu tugas, E4 Tugas terlambat (cost), E5 Knowledge, E6 Dinilai membantu"},
+    "shift": {"masalah": "Menentukan jumlah kasir di shift pagi dan sore sesuai pola keramaian toko.",
+              "pengambil": "Manajer toko", "jenis": "Terstruktur · penjadwalan",
+              "rumus": ["porsi shift = transaksi shift ÷ transaksi sehari", "kasir shift = 1 + (kasir − 2) × porsi (sisa terbesar)"],
+              "kriteria": "Rata-rata transaksi per jam 8 minggu, pergantian shift pukul 14.00, tren transaksi MIS"},
+}
+
+
+def hasil_semua(mo):
+    """Hasil perhitungan terkini keenam kasus (dipakai halaman Alternatif & Hasil)."""
+    h = {}
+    juara = []
+    for k in daftar_kategori():
+        _, _, _, hk = data_saw(k["id"])
+        if hk["ranking"]:
+            r = hk["ranking"]
+            juara.append({"kategori": k["nama"], "ikon": k["ikon"], "supplier": r[0]["nama"], "v": r[0]["v"],
+                          "kedua": r[1]["nama"] if len(r) > 1 else "–", "v2": r[1]["v"] if len(r) > 1 else None, "n": len(r)})
+    h["supplier"] = juara
+    if not mo:
+        return h
+    rs, st = _data_restok(mo)
+    h["restok"] = [r for r in rs if r["saran"] > 0]
+    kp, hp, ip = _data_promo(mo)
+    h["promo"] = {"krit": kp, "rank": hp["ranking"][:int(st["promo_jumlah"])], "X": hp["X"], "info": ip}
+    h["bundling"] = modul.hitung_bundling(mo["produk"], mo["keranjang"], st["bundling_diskon"])[:5]
+    kg, hg, ig = _data_pegawai(mo)
+    h["pegawai"] = {"krit": kg, "rank": hg["ranking"], "X": hg["X"], "info": ig}
+    h["shift"], _, _ = _data_shift(mo)
+    h["st"] = st
+    return h
+
+
+@app.route("/alternatif")
+@login_wajib()
+def alternatif():
+    mo = butuh_data()
+    alt = {k: dict(v) for k, v in ALTERNATIF.items()}
+    for nama, krit in (("supplier", daftar_kriteria()), ("promo", kriteria_modul("promo")), ("pegawai", kriteria_modul("pegawai"))):
+        alt[nama]["kriteria"] = ", ".join(f"{k['kode']} {k['nama']} ({k['jenis']}, bobot {f_nilai(k['bobot'])})" for k in krit)
+    return render_template("alternatif.html", mo=mo, h=hasil_semua(mo), alt=alt,
+                           integ={k: integrasi_kasus(k, mo) for k in MODUL}, active="alternatif")
+
+
+@app.route("/")
+@login_wajib()
+def dashboard():
+    """Pusat Keputusan: ringkasan keenam kasus DSS dalam satu layar."""
+    mo = butuh_data()
+    kartu = {}
+    juara = juara_supplier_kategori()
+    kartu["supplier"] = {"utama": f"{len(juara)} kategori", "isi": ", ".join(f"{v['supplier']}" for v in list(juara.values())[:2]) or "Belum ada penilaian lengkap",
+                         "href": url_for("hitung")}
+    if mo:
+        rs, _ = _data_restok(mo)
+        perlu = [r for r in rs if r["saran"] > 0]
+        kartu["restok"] = {"utama": f"{len(perlu)} produk", "isi": "perlu dipesan · " + ", ".join(r["nama"] for r in perlu[:2]) if perlu else "Semua stok aman",
+                           "href": url_for("restok"), "alert": any(r["tone"] == "r" for r in rs)}
+        _, hp, _ = _data_promo(mo)
+        kartu["promo"] = {"utama": hp["ranking"][0]["nama"] if hp["ranking"] else "–", "isi": f"kandidat promo teratas · skor {hp['ranking'][0]['v'] * 100:.1f}" if hp["ranking"] else "",
+                          "href": url_for("promo")}
+        st = pengaturan()
+        bd = modul.hitung_bundling(mo["produk"], mo["keranjang"], st["bundling_diskon"])
+        kartu["bundling"] = {"utama": f"{bd[0]['a']['nama']} + {bd[0]['b']['nama']}" if bd else "–",
+                             "isi": f"lift {bd[0]['lift']:.2f} · {bd[0]['bersama']}× dibeli bersama" if bd else "Belum ada pasangan produk", "href": url_for("bundling")}
+        _, hg, _ = _data_pegawai(mo)
+        kartu["pegawai"] = {"utama": hg["ranking"][0]["nama"] if hg["ranking"] else "–", "isi": f"skor {hg['ranking'][0]['v'] * 100:.1f} dari TPS, OAS, KMS" if hg["ranking"] else "",
+                            "href": url_for("pegawai")}
+        hs, _, _ = _data_shift(mo)
+        kartu["shift"] = {"utama": f"{hs['kerja']['kasir_pagi']} pagi · {hs['kerja']['kasir_sore']} sore",
+                          "isi": f"jam puncak {hs['kerja']['puncak']:02d}.00 (hari kerja), {hs['libur']['puncak']:02d}.00 (akhir pekan)" if hs['kerja']['puncak'] is not None else "",
+                          "href": url_for("shift")}
+    lain = db.rows("SELECT * FROM keputusan_lain ORDER BY id DESC LIMIT 6")
+    sup = db.rows("""SELECT p.id, p.judul, p.pemenang_nama, p.dibuat_pada, p.dibuat_oleh, k.nama kategori FROM keputusan p
+                     JOIN kategori k ON k.id=p.kategori_id ORDER BY p.id DESC LIMIT 6""")
+    terbaru = sorted([{"modul": "supplier", "judul": r["judul"], "ringkasan": f"🥇 {r['pemenang_nama']} ({r['kategori']})", "waktu": r["dibuat_pada"],
+                       "oleh": r["dibuat_oleh"], "href": url_for("keputusan_detail", kid=r["id"])} for r in sup] +
+                     [{"modul": r["modul"], "judul": r["judul"], "ringkasan": r["ringkasan"], "waktu": r["dibuat_pada"], "oleh": r["dibuat_oleh"],
+                       "href": url_for("keputusan_lain_detail", kid=r["id"])} for r in lain], key=lambda x: x["waktu"], reverse=True)[:6]
+    integ = {k: integrasi_kasus(k, mo) for k in MODUL}
+    n_tl = db.val("SELECT COUNT(*) FROM tindak_lanjut")
+    return render_template("pusat.html", kartu=kartu, mo=mo, terbaru=terbaru, integ=integ, n_tl=n_tl, active="dashboard")
 
 
 # ---------------- Integrasi data (back end) ----------------
@@ -745,7 +1333,20 @@ def api_keputusan():
     rows = db.rows("""SELECT p.id, k.nama kategori, p.judul, p.pemenang_nama, round(p.nilai_v,4) nilai_v,
                              round(p.nilai_v*100,2) skor, p.dibuat_oleh, p.dibuat_pada
                       FROM keputusan p JOIN kategori k ON k.id=p.kategori_id ORDER BY p.id DESC LIMIT 20""")
-    return jsonify(ok=True, jumlah=len(rows), keputusan=[dict(r) for r in rows])
+    lain = db.rows("""SELECT k.id, k.modul, k.judul, k.ringkasan, k.dibuat_oleh, k.dibuat_pada,
+                             (SELECT COUNT(*) FROM tindak_lanjut t WHERE t.sumber='lain' AND t.keputusan_id=k.id) tindak_lanjut
+                      FROM keputusan_lain k ORDER BY k.id DESC LIMIT 20""")
+    semua = sorted([{"modul": "supplier", "kasus": MODUL["supplier"][1], "ikon": MODUL["supplier"][0], "judul": r["judul"],
+                     "ringkasan": f"{r['pemenang_nama']} ({r['kategori']}) · skor {r['skor']}", "dibuat_oleh": r["dibuat_oleh"],
+                     "dibuat_pada": r["dibuat_pada"],
+                     "tindak_lanjut": db.val("SELECT COUNT(*) FROM tindak_lanjut WHERE sumber='supplier' AND keputusan_id=?", (r["id"],))} for r in rows] +
+                   [{"modul": r["modul"], "kasus": MODUL.get(r["modul"], ("", r["modul"]))[1], "ikon": MODUL.get(r["modul"], ("🧭",))[0],
+                     "judul": r["judul"], "ringkasan": r["ringkasan"], "dibuat_oleh": r["dibuat_oleh"], "dibuat_pada": r["dibuat_pada"],
+                     "tindak_lanjut": r["tindak_lanjut"]} for r in lain], key=lambda x: x["dibuat_pada"], reverse=True)[:20]
+    per_kasus = {k: (db.val("SELECT COUNT(*) FROM keputusan") if k == "supplier" else
+                     db.val("SELECT COUNT(*) FROM keputusan_lain WHERE modul=?", (k,))) for k in MODUL}
+    return jsonify(ok=True, jumlah=len(rows), keputusan=[dict(r) for r in rows], semua=semua,
+                   per_kasus=[{"modul": k, "ikon": v[0], "kasus": v[1], "metode": v[2], "jumlah": per_kasus[k]} for k, v in MODUL.items()])
 
 
 # ---------------- Log SSO ----------------

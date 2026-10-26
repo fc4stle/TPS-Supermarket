@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% set judul = 'Pusat Keputusan' %}
+{% set sub = 'Enam kasus pendukung keputusan MartOffice — semuanya memakai data dari TPS, OAS, KMS, dan MIS.' %}
+{% set TANYA = {
+  'supplier': 'Supplier mana yang paling layak dipilih untuk tiap kategori?',
+  'restok': 'Produk apa yang harus dipesan sekarang, dan berapa banyak?',
+  'promo': 'Produk apa yang sebaiknya didiskon, dan apa dampaknya?',
+  'bundling': 'Produk apa yang cocok dijual sebagai paket?',
+  'pegawai': 'Siapa pegawai dengan kinerja terbaik bulan ini?',
+  'shift': 'Berapa kasir yang dibutuhkan di shift pagi dan sore?' } %}
+{% block isi %}
+<section class="hero-banner dss-hero">
+  <div>
+    <span class="hb-kicker">Halo, {{ user.nama.split()[0] }} · masuk lewat SSO</span>
+    <h2>Satu pusat, enam keputusan 🧭</h2>
+    <p>DSS MartOffice membantu manajer memutuskan supplier, restok, promo, bundling, pegawai terbaik, dan jumlah kasir per shift — dihitung otomatis dari data TPS, OAS, KMS, dan MIS.</p>
+  </div>
+  <div class="hb-fruit" aria-hidden="true">🚚📦🏷️🧺🏅🕒</div>
+</section>
+{% if not mo %}<div class="alert err"><div>Data MartOffice belum dapat diambil, sehingga kasus 2–6 belum dapat dihitung. Buka <a href="{{ url_for('integrasi') }}">Integrasi Data</a>.</div></div>{% endif %}
+
+<div class="mcards">
+{% for kode, (ic, nama, metode) in MODUL.items() %}
+  {% set k = kartu.get(kode) %}
+  <a class="mcard {{ 'warn' if k and k.alert else '' }}" href="{{ k.href if k else '#' }}">
+    <div class="mc-top"><span class="mc-ic">{{ ic }}</span><span class="mc-no">{{ loop.index }}</span></div>
+    <h3>{{ nama }}</h3>
+    <p class="mc-q">{{ TANYA[kode] }}</p>
+    <div class="mc-res"><small>Hasil saat ini</small><b>{{ k.utama if k else '–' }}</b><small>{{ k.isi if k else 'menunggu data MartOffice' }}</small></div>
+    <div class="mc-foot"><span class="badge n">{{ metode }}</span>{% for s in ['TPS', 'OAS', 'KMS', 'MIS'] %}<span class="badge src-{{ s|lower }}">{{ s }}</span>{% endfor %}<span class="mc-go">Buka →</span></div>
+  </a>
+{% endfor %}
+</div>
+
+
+<section class="card tight">
+  <div class="card-h"><h3>🔗 Peta Integrasi: 6 Kasus × TPS · OAS · KMS · MIS</h3><a class="btn sm ghost" href="{{ url_for('alternatif') }}">Alternatif &amp; hasil perhitungan →</a><span class="hint">data yang dipakai tiap kasus dan keluarannya kembali ke MartOffice · {{ n_tl }} tindak lanjut terkirim</span></div>
+  <div class="table-wrap"><table class="peta">
+    <thead><tr><th>Kasus</th>{% for m in ['TPS', 'OAS', 'KMS', 'MIS'] %}<th><span class="badge src-{{ m|lower }}">{{ m }}</span></th>{% endfor %}<th>↩ Keluaran ke MartOffice</th></tr></thead>
+    <tbody>{% for kode, (ic, nama, metode) in MODUL.items() %}{% set g = integ[kode] %}
+      <tr><td class="nowrap"><b>{{ ic }} {{ nama }}</b><small class="block">{{ metode }}</small></td>
+        {% for m in ['TPS', 'OAS', 'KMS', 'MIS'] %}<td>{{ g.masuk[m] }}</td>{% endfor %}
+        <td>{{ g.keluar }}<small class="block">{{ g.terkirim }} terkirim</small></td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+</section>
+
+<div class="grid g-23">
+  <section class="card panel">
+    <div class="card-h"><h3>🗒️ Keputusan Terbaru (semua kasus)</h3><a class="btn sm ghost" href="{{ url_for('keputusan') }}">Riwayat →</a></div>
+    {% if terbaru %}
+    <ul class="feed">{% for t in terbaru %}
+      <li><span class="feed-ic">{{ MODUL[t.modul][0] }}</span>
+        <div><a href="{{ t.href }}"><b>{{ t.judul }}</b></a><small class="block">{{ t.ringkasan }}</small></div>
+        <small class="feed-t">{{ t.waktu|tgl }}<span class="block">{{ t.oleh }}</span></small></li>
+    {% endfor %}</ul>
+    {% else %}<div class="empty"><div class="empty-ic">🏆</div><b>Belum ada keputusan</b></div>{% endif %}
+  </section>
+  <section class="card panel">
+    <div class="card-h"><h3>🔗 Sumber Data</h3>{% if mo %}<span class="badge {{ 'y' if mo._offline else 'g' }}">{{ 'Snapshot' if mo._offline else 'Terhubung' }}</span>{% endif %}</div>
+    <div class="srclist">
+      <div><span class="badge src-tps">TPS</span> transaksi, produk, stok, jam transaksi, keranjang belanja</div>
+      <div><span class="badge src-oas">OAS</span> dokumen pemasok, tugas &amp; ketepatan waktu, jadwal shift</div>
+      <div><span class="badge src-kms">KMS</span> SOP kedaluwarsa &amp; penerimaan barang, ide bundling, kontribusi knowledge</div>
+      <div><span class="badge src-mis">MIS</span> tren omzet, peringatan stok, kinerja pegawai</div>
+    </div>
+    {% if mo %}<p class="sumber">Data diambil {{ mo._waktu|tgl }} dari <code>api/dss_data.php</code> · <a href="{{ url_for('integrasi') }}">detail integrasi</a></p>{% endif %}
+  </section>
+</div>
+{% endblock %}

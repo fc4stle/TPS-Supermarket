@@ -12,21 +12,32 @@
 </head>
 <body class="dss">
 {% set menu = [
-  ('Ringkasan', [('dashboard', '🧭', 'Dashboard DSS', url_for('dashboard'))]),
-  ('Data Keputusan', [
-    ('supplier', '🚚', 'Data Supplier', url_for('supplier')),
+  ('Ringkasan', [('dashboard', '🧭', 'Pusat Keputusan', url_for('dashboard')), ('alternatif', '🗂️', 'Alternatif & Hasil', url_for('alternatif'))]),
+  ('1 · Pemilihan Supplier', [
+    ('sup-ringkasan', '🚚', 'Ringkasan Supplier', url_for('supplier_ringkasan')),
+    ('supplier', '📇', 'Data Supplier', url_for('supplier')),
     ('kriteria', '⚖️', 'Kriteria & Bobot', url_for('kriteria')),
     ('penilaian', '📝', 'Penilaian Supplier', url_for('penilaian')),
-  ]),
-  ('Analisis SAW', [
     ('hitung', '🧮', 'Perhitungan SAW', url_for('hitung')),
     ('sensitivitas', '🎚️', 'Analisis Sensitivitas', url_for('sensitivitas')),
-    ('keputusan', '🏆', 'Riwayat Keputusan', url_for('keputusan')),
   ]),
-  ('Sistem', [('integrasi', '🔗', 'Integrasi Data', url_for('integrasi')), ('log', '🔐', 'Log Single Sign-On', url_for('log_sso'))]),
+  ('2 · Persediaan & Penjualan', [
+    ('restok', '📦', 'Rekomendasi Restok', url_for('restok')),
+    ('promo', '🏷️', 'Produk Promo', url_for('promo')),
+    ('bundling', '🧺', 'Paket Bundling', url_for('bundling')),
+  ]),
+  ('3 · Pegawai', [
+    ('pegawai', '🏅', 'Pegawai Terbaik', url_for('pegawai')),
+    ('shift', '🕒', 'Kasir per Shift', url_for('shift')),
+  ]),
+  ('Arsip & Sistem', [
+    ('keputusan', '🏆', 'Riwayat Keputusan', url_for('keputusan')),
+    ('integrasi', '🔗', 'Integrasi Data', url_for('integrasi')),
+    ('log', '🔐', 'Log Single Sign-On', url_for('log_sso')),
+  ]),
 ] %}
 <div class="shell">
-  <aside class="side" id="side">
+  <aside class="side compact" id="side">
     <a class="brand" href="{{ url_for('dashboard') }}">
       <span class="logo">🧭</span>
       <span><b>Mart</b><i>Office</i><small>Decision Support System</small></span>
