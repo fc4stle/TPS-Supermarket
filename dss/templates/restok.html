@@ -34,7 +34,9 @@
             <td class="pcell"><b>{{ r.ikon }} {{ r.nama }}</b><small class="block">{{ r.sku }} · {{ r.kategori }}</small>
               <div class="flags">{% if r.mis %}<span class="badge src-mis" title="Muncul di Pusat Peringatan MIS">⚠ MIS {{ r.mis }}</span>{% endif %}
               {% if r.mudah_rusak %}<span class="badge src-kms" title="SOP Kedaluwarsa & FIFO (KMS): siklus dibatasi {{ r.siklus|nilai }} hari">🍃 siklus {{ r.siklus|nilai }} hr</span>{% endif %}
-              {% if r.ditugaskan %}<span class="badge src-oas" title="Sudah ada tugas [DSS] di OAS yang belum selesai">📋 sudah ditugaskan</span>{% endif %}</div></td>
+              {% if r.ditugaskan %}<span class="badge src-oas" title="Sudah ada tugas [DSS] di OAS yang belum selesai">📋 sudah ditugaskan</span>{% endif %}
+              {% if r.es_order and r.es_order.kode in ('K01', 'K02', 'K03') %}<span class="badge src-es" title="Keputusan Expert System waktu order (CF {{ (r.es_order.cf * 100)|angka(0) }}%)">🧠 ES: {{ r.es_order.keputusan }}{{ (' · ' ~ r.es_order.tanggal_order) if r.es_order.kode == 'K03' else '' }}</span>{% endif %}
+              {% if r.es_cari %}<span class="badge src-es" title="Dicari pembeli lewat konsultasi Expert System tetapi stok habis">🛒 dicari pembeli {{ r.es_cari }}x</span>{% endif %}</div></td>
             <td class="num"><b>{{ r.stok }}</b> <small>{{ r.satuan }}</small></td>
             <td class="num">{{ r.rata|angka(1) }}</td>
             <td class="num">{{ r.lead|nilai }} hari</td>

@@ -1,6 +1,24 @@
 <?php
 require __DIR__ . '/../includes/app.php';
 need('manajer');
+
+/* ---- Tombol Expert System: jalankan analisis waktu order / kirim tugas ke OAS ---- */
+if (is_post() && es_tersedia()) {
+    $aksiEs = post('es');
+    if ($aksiEs === 'order') {
+        $h = es_order_jalankan(uid());
+        $n = $h['ringkasan'];
+        flash('ok', 'Analisis waktu order selesai untuk ' . count($h['hasil']) . ' produk: ' . ($n['K01'] ?? 0) . ' order hari ini, '
+            . ($n['K02'] ?? 0) . ' order 1–2 hari lagi, ' . ($n['K03'] ?? 0) . ' terjadwal.' . ($h['dss']['ok'] ? ' Data DSS diperbarui.' : ' (' . $h['dss']['pesan'] . ')'));
+    } elseif ($aksiEs === 'tugaskan') {
+        $h = es_order_tugaskan(uid());
+        flash($h['dibuat'] ? 'ok' : 'info', $h['dibuat'] ? $h['dibuat'] . ' tugas order dikirim ke OAS untuk ' . $h['staf'] . '.' : $h['pesan']);
+    } elseif ($aksiEs === 'permintaan') {
+        $h = es_permintaan_tugaskan(uid());
+        flash($h['dibuat'] ? 'ok' : 'info', $h['dibuat'] ? 'Permintaan pembeli (' . $h['produk'] . ' produk) dikirim ke OAS untuk ' . $h['staf'] . '.' : $h['pesan']);
+    }
+    redirect('mis/index.php#es');
+}
 mis_refresh();
 $per = mis_periode();
 [$d, $s, $pd, $ps] = [$per['dari'], $per['sampai'], $per['pdari'], $per['psampai']];
@@ -35,6 +53,7 @@ $nilaiStok = (float) val('SELECT COALESCE(SUM(harga*stok),0) FROM produk WHERE a
 $dssAll = dss_keputusan_lengkap();  // keputusan keenam kasus DSS (Flask, port 5055)
 $dssKep = $dssAll['keputusan'] ?? null;
 $dssRing = $dssAll !== null ? dss_ringkasan() : null;
+$esR = es_tersedia() ? es_ringkasan() : null;   // ringkasan Expert System (rekomendasi pembeli & waktu order)
 
 mis_start('Executive Dashboard', 'mis', 'Kinerja perusahaan dalam satu layar — dirangkum dari TPS, OAS, dan KMS.', $per);
 ?>
@@ -134,5 +153,48 @@ mis_start('Executive Dashboard', 'mis', 'Kinerja perusahaan dalam satu layar —
     <?php endif; ?>
   <?php endif; ?>
   <?= sumber('DSS · keputusan & keputusan_lain (SQLite) via /api/keputusan · tindak lanjut tercatat di tugas/pengumuman/agenda OAS') ?>
+</section>
+<section class="card panel" id="es">
+  <div class="card-h"><h3>🧠 Expert System</h3>
+    <?php if ($esR !== null): ?>
+    <form method="post" class="actions" style="display:flex;gap:6px;flex-wrap:wrap"><?= csrf() ?>
+      <button class="btn sm" name="es" value="order">⚙️ Jalankan analisis waktu order</button>
+      <?php if ($esR['order_mendesak']): ?><button class="btn sm ghost" name="es" value="tugaskan">📋 Kirim order mendesak ke OAS</button><?php endif; ?>
+      <?php if (array_filter($esR['permintaan_tertunda'], fn($p) => $p['status'] === 'baru')): ?><button class="btn sm ghost" name="es" value="permintaan">🛒 Kirim permintaan pembeli ke OAS</button><?php endif; ?>
+    </form>
+    <?php endif; ?>
+  </div>
+  <?php if ($esR && $esR['analisis_terakhir']): ?><p class="muted mb0" style="font-size:12.5px;margin-top:-6px">Analisis order terakhir <?= e(tgl($esR['analisis_terakhir'])) ?></p><?php endif; ?>
+  <?php if ($esR === null): ?>
+    <?= empty_state('🧩', 'Database Expert System belum dipasang', 'Impor <code>es_database.sql</code> di phpMyAdmin untuk mengaktifkan rekomendasi pembeli dan keputusan waktu order.') ?>
+  <?php else: ?>
+    <div class="grid g-23">
+      <div>
+        <small class="muted">Keputusan waktu order (manajer)</small>
+        <div class="dss-kasus" style="margin-top:6px">
+          <?php foreach ($esR['order'] as $o): ?>
+            <div><span><?= ['r' => '⛔', 'o' => '⏳', 'y' => '📅', 'g' => '✅', 'n' => '⏸️'][$o['warna']] ?? '•' ?></span><b><?= e($o['nama']) ?></b><small><?= (int) $o['jumlah_produk'] ?> produk · <?= angka($o['total_qty']) ?> unit<?= $o['sudah_ditugaskan'] ? ' · ' . (int) $o['sudah_ditugaskan'] . ' ditugaskan' : '' ?></small></div>
+          <?php endforeach; ?>
+        </div>
+        <?= tabel(['Produk', 'Keputusan', 'Qty', 'Tanggal order', 'Status'], array_map(fn($x) => [e($x['nama']), e($x['kesimpulan']), angka($x['qty_saran']) . ' ' . e($x['satuan']),
+              tgl($x['tanggal_order'], false), $x['status'] === 'ditugaskan' ? badge('tugas OAS', 'b') : badge('saran', 'y')], $esR['order_mendesak']),
+              'Belum ada produk yang harus segera diorder. Klik “Jalankan analisis waktu order”.') ?>
+      </div>
+      <div>
+        <small class="muted">Rekomendasi pembeli</small>
+        <dl style="margin:6px 0 10px">
+          <dt>Konsultasi hari ini / 7 hari</dt><dd><?= $esR['konsultasi_hari_ini'] ?> / <?= $esR['konsultasi_7_hari'] ?></dd>
+        </dl>
+        <?php foreach ($esR['produk_teratas'] as $i => $p): ?>
+          <div class="rank"><span class="no"><?= $i + 1 ?></span><div class="rb"><b><?= e($p['nama']) ?></b><small>direkomendasikan</small></div><span class="rv"><?= (int) $p['n'] ?>x</span></div>
+        <?php endforeach; ?>
+        <?php if ($esR['permintaan_tertunda']): ?>
+          <p class="muted" style="font-size:12.5px;margin:10px 0 4px">Dicari pembeli tetapi stok habis</p>
+          <?php foreach ($esR['permintaan_tertunda'] as $p): ?><span class="badge r" style="margin:2px"><?= e($p['nama']) ?> · <?= (int) $p['n'] ?>x</span><?php endforeach; ?>
+        <?php endif; ?>
+      </div>
+    </div>
+  <?php endif; ?>
+  <?= sumber('es_order_analisis, es_konsultasi, es_konsultasi_hasil, es_permintaan (Expert System) · data TPS, OAS, KMS, MIS, DSS') ?>
 </section>
 <?php mis_end();

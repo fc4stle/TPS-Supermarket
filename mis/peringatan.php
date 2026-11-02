@@ -4,7 +4,7 @@ need('manajer');
 mis_refresh();
 
 $semua = mis_alerts();
-$modul = pilih(get('modul'), ['TPS', 'OAS', 'KMS'], '');
+$modul = pilih(get('modul'), ['TPS', 'OAS', 'KMS', 'ES'], '');
 $list = $modul ? array_values(array_filter($semua, fn($a) => $a['modul'] === $modul)) : $semua;
 $hit = fn($arr, $k, $v) => count(array_filter($arr, fn($a) => $a[$k] === $v));
 $level = ['kritis' => ['⛔ Kritis', 'Perlu ditangani hari ini'], 'perhatian' => ['⚠️ Perhatian', 'Perlu ditindaklanjuti minggu ini'], 'info' => ['ℹ️ Info', 'Untuk diketahui dan dipertimbangkan']];
@@ -21,7 +21,7 @@ mis_start('Pusat Peringatan', 'mis-peringatan', 'Hal-hal yang perlu perhatian ma
 <div class="card mis-filter no-print">
   <div class="chips">
     <a class="chip <?= $modul === '' ? 'on' : '' ?>" href="?">Semua modul (<?= count($semua) ?>)</a>
-    <?php foreach (['TPS' => '🧾', 'OAS' => '📋', 'KMS' => '📚'] as $m => $ic) echo '<a class="chip ' . ($modul === $m ? 'on' : '') . '" href="?modul=' . $m . '">' . $ic . ' ' . $m . ' (' . $hit($semua, 'modul', $m) . ')</a>'; ?>
+    <?php foreach (['TPS' => '🧾', 'OAS' => '📋', 'KMS' => '📚', 'ES' => '🧠'] as $m => $ic) echo '<a class="chip ' . ($modul === $m ? 'on' : '') . '" href="?modul=' . $m . '">' . $ic . ' ' . $m . ' (' . $hit($semua, 'modul', $m) . ')</a>'; ?>
   </div><span class="grow"></span>
   <button type="button" class="sm ghost" onclick="window.print()">🖨️ Cetak</button>
 </div>
@@ -49,6 +49,8 @@ mis_start('Pusat Peringatan', 'mis-peringatan', 'Hal-hal yang perlu perhatian ma
       [badge('KMS', 'n'), 'Knowledge menunggu review lebih dari 2 hari', 'Perhatian', '<code>artikel_kms.status</code>'],
       [badge('KMS', 'n'), 'Helpful rate di bawah 50% (minimal 2 feedback)', 'Perhatian', '<code>feedback_kms.membantu</code>'],
       [badge('KMS', 'n'), 'Knowledge published belum pernah dibaca / kategori kosong', 'Info', '<code>artikel_kms.dilihat</code>'],
+      [badge('ES', 'n'), 'Expert System memutuskan produk harus diorder hari ini', 'Kritis', '<code>es_order_analisis</code>'],
+      [badge('ES', 'n'), 'Produk dicari pembeli lewat konsultasi ES tetapi stok habis', 'Perhatian', '<code>es_permintaan</code>'],
   ]) ?>
 </section>
 <?php mis_end();

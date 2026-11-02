@@ -335,6 +335,13 @@ function mis_alerts(): array
     if ($sepi) $add('info', 'KMS', $sepi . ' knowledge published belum pernah dibaca', 'Sosialisasikan lewat pengumuman agar pengetahuan terpakai.', 'mis/kms.php');
     foreach (rows("SELECT k.nama FROM kategori_kms k WHERE k.aktif=1 AND NOT EXISTS(SELECT 1 FROM artikel_kms a WHERE a.id_kategori=k.id AND a.status='published')") as $k)
         $add('info', 'KMS', 'Kategori tanpa knowledge: ' . $k['nama'], 'Belum ada artikel published di kategori ini.', 'kms/index.php');
+    // ---- ES (Expert System) ----
+    if (function_exists('es_tersedia') && es_tersedia()) {
+        $o = rows("SELECT nama FROM v_es_order_terbaru WHERE kode_kesimpulan='K01' AND status='saran' ORDER BY nama");
+        if ($o) $add('kritis', 'ES', count($o) . ' produk harus diorder hari ini', 'Keputusan Expert System waktu order: ' . implode(', ', array_slice(array_column($o, 'nama'), 0, 3)) . (count($o) > 3 ? ', …' : '') . '.', 'mis/index.php#es');
+        $r = rows("SELECT p.nama, COUNT(*) n FROM es_permintaan r JOIN produk p ON p.id=r.id_produk WHERE r.status='baru' GROUP BY p.id, p.nama ORDER BY n DESC");
+        if ($r) $add('perhatian', 'ES', count($r) . ' produk dicari pembeli tetapi stok habis', 'Dari konsultasi rekomendasi produk: ' . implode(', ', array_map(fn($x) => $x['nama'] . ' (' . $x['n'] . 'x)', array_slice($r, 0, 3))) . '.', 'mis/index.php#es');
+    }
 
     $urut = ['kritis' => 0, 'perhatian' => 1, 'info' => 2];
     usort($a, fn($x, $y) => $urut[$x['level']] <=> $urut[$y['level']]);

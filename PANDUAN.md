@@ -75,6 +75,19 @@ Login sebagai **manajer** → klik menu **📈 MIS · Kinerja Perusahaan**. MIS 
 ### Data simulasi (opsional)
 Agar grafik dan perbandingan periode di MIS terisi, jalankan `data_simulasi.sql` **satu kali** setelah `database.sql` (cara menjalankannya sama). File ini menambahkan aktivitas toko fiktif ±9 minggu terakhir dan 3 akun staff (`dimas`, `nadia`, `bagus`, password `staff123`). Untuk kembali ke kondisi bersih, jalankan ulang `database.sql` saja.
 
+## Expert System (ES)
+**Database:** impor `es_database.sql` lewat phpMyAdmin/MySQL Workbench **setelah** `database.sql` (dan `data_simulasi.sql`). Aman dijalankan ulang; tabel TPS/OAS/KMS/MIS tidak berubah.
+
+| Menu | Untuk | Masukan | Hasil |
+|---|---|---|---|
+| 1 · Rekomendasi Produk | Pembeli / staf toko | Jawaban 5 pertanyaan (tujuan, jumlah orang, anggaran, preferensi, waktu) | Produk paling tepat + CF + alasan, produk habis dicatat sebagai permintaan |
+| 2 · Waktu Order Barang | Manajer | Otomatis dari TPS (stok, penjualan, pola akhir pekan), DSS (lead time supplier, promo, bundling), MIS (peringatan stok, tren transaksi), KMS (SOP produk segar), OAS (tugas order terbuka, agenda stock opname) | Kapan order (hari ini / 1–2 hari / tanggal terjadwal / tunda / sudah diproses / jangan order) + jumlah pesan |
+
+**Back end:** `includes/es.php` (mesin forward chaining + Certainty Factor) dan `api/es.php` (API JSON, wajib login MartOffice; POST wajib token CSRF). Aksi utama:
+`?aksi=pertanyaan`, `?aksi=coba&fakta=F01,F08,F11,F14,F17`, `POST ?aksi=konsultasi`, `POST ?aksi=order` (manajer), `?aksi=order`, `?aksi=order_produk&id=`, `POST ?aksi=order_tugaskan`, `POST ?aksi=permintaan_tugaskan`, `POST ?aksi=sinkron_dss`, `?aksi=basis&menu=ORDER`, `?aksi=ringkasan`.
+
+**Integrasi:** keputusan order dan permintaan pembeli menjadi tugas `[ES]` di OAS untuk staf gudang; MIS Executive Dashboard dan Pusat Peringatan menampilkan hasil ES; DSS mengirim lead time/promo/bundling lewat `/api/es` dan menampilkan keputusan ES di halaman Rekomendasi Restok.
+
 ## Akun
 | Role | Username | Password |
 |---|---|---|

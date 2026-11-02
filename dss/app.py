@@ -824,7 +824,7 @@ def integrasi_kasus(nama, mo):
             "TPS": "stok & penjualan 30 hari per produk",
             "OAS": f"tugas [DSS] di OAS yang belum selesai ({len(tugas_dss_aktif(mo))} aktif) → produk yang sudah ditugaskan ditandai agar tidak dipesan dobel",
             "KMS": f"SOP kedaluwarsa & FIFO → siklus produk mudah rusak dibatasi ({judul(artikel_kms(mo, 'kedaluwarsa', 'fifo'))})",
-            "MIS": f"{len(mis.get('produk_peringatan', []))} produk di Pusat Peringatan MIS ditandai ⚠",
+            "MIS": f"{len(mis.get('produk_peringatan', []))} produk di Pusat Peringatan MIS ditandai ⚠ · keputusan waktu order Expert System ikut ditampilkan",
         },
         "promo": {
             "TPS": "stok, penjualan 30 hari & 30 hari sebelumnya",
@@ -992,8 +992,16 @@ def simpan_pengaturan(nama):
 def _data_restok(mo):
     st = pengaturan()
     mis_ids = {x["id"]: x["level"] for x in mo.get("mis", {}).get("produk_peringatan", [])}
-    return modul.hitung_restok(mo["produk"], juara_supplier_kategori(), st["restok_siklus"], st["restok_aman"], st["restok_lead"],
-                               st.get("restok_segar", 3), mis_ids, tugas_dss_aktif(mo)), st
+    rows = modul.hitung_restok(mo["produk"], juara_supplier_kategori(), st["restok_siklus"], st["restok_aman"], st["restok_lead"],
+                               st.get("restok_segar", 3), mis_ids, tugas_dss_aktif(mo))
+    # hasil Expert System MartOffice: keputusan waktu order & produk yang dicari pembeli tetapi habis
+    es = mo.get("es") or {}
+    order = {x["id_produk"]: x for x in es.get("order", [])}
+    cari = {x["id_produk"]: x["n"] for x in es.get("permintaan", [])}
+    for r in rows:
+        r["es_order"] = order.get(r["id"])
+        r["es_cari"] = cari.get(r["id"], 0)
+    return rows, st
 
 
 @app.route("/restok", methods=["GET", "POST"])
@@ -1323,6 +1331,36 @@ def api_status():
                ("pengguna", "kategori", "supplier", "kriteria", "nilai", "keputusan", "sso_log", "sinkron")},
         sinkron_terakhir=dict(akhir) if akhir else None,
     )
+
+
+@app.route("/api/es")
+def api_es():
+    """
+    Hasil DSS untuk Expert System MartOffice (ditandatangani HMAC "dss:es"):
+    supplier terpilih + lama pengiriman, kandidat promo, paket bundling, rencana restok, dan parameter restok.
+    """
+    home = request.args.get("home") or ""
+    if not sso.cek_api("dss:es|" + home, request.args.get("ts"), request.args.get("sig")):
+        return jsonify(ok=False, pesan="Tanda tangan API tidak valid"), 401
+    st = pengaturan()
+    out = {"ok": True, "waktu": db.sekarang(),
+           "pengaturan": {"siklus": st["restok_siklus"], "stok_aman": st["restok_aman"],
+                          "siklus_segar": st.get("restok_segar", 3), "lead_bawaan": st["restok_lead"]},
+           "supplier": [{"kategori": k, "supplier": v["supplier"], "v": round(v["v"], 4), "lead": v["lead"]}
+                        for k, v in juara_supplier_kategori().items()],
+           "promo": [], "bundling": [], "restok": []}
+    mo = data_martoffice(home or None)
+    if mo and "produk" in mo:
+        _, hp, _ = _data_promo(mo)
+        out["promo"] = [{"id_produk": r["id"], "nama": r["nama"], "skor": round(r["v"] * 100, 2)}
+                        for r in hp["ranking"][:int(st["promo_jumlah"])]]
+        out["bundling"] = [{"a": r["a"]["id"], "b": r["b"]["id"], "label": f"{r['a']['nama']} + {r['b']['nama']}",
+                            "lift": round(r["lift"], 4), "harga_paket": r["harga_paket"]}
+                           for r in modul.hitung_bundling(mo["produk"], mo["keranjang"], st["bundling_diskon"])[:5]]
+        rs, _ = _data_restok(mo)
+        out["restok"] = [{"id_produk": r["id"], "nama": r["nama"], "saran": r["saran"], "status": r["status"]}
+                         for r in rs if r["saran"] > 0]
+    return jsonify(out)
 
 
 @app.route("/api/keputusan")

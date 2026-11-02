@@ -19,6 +19,7 @@ require __DIR__ . '/../includes/config.php';
 require __DIR__ . '/../includes/functions.php';
 require __DIR__ . '/../includes/mis.php';
 require __DIR__ . '/../includes/sso.php';
+require __DIR__ . '/../includes/es.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -154,7 +155,16 @@ try {
               JOIN transaksi t ON t.id=a.id_transaksi WHERE DATE(t.waktu) >= CURDATE() - INTERVAL 59 DAY
               GROUP BY a.id_produk, b.id_produk HAVING n >= 3 ORDER BY n DESC LIMIT 80'));
 
-    echo json_encode(['ok' => true, 'waktu' => date('Y-m-d H:i:s'), 'tps' => $tps, 'mis' => $mis, 'oas' => $oas, 'kms' => $kms,
+    /* ---------- Expert System: keputusan waktu order & permintaan pembeli (dibaca DSS restok) ---------- */
+    $es = es_tersedia() ? [
+        'order' => array_map(fn($r) => ['id_produk' => (int) $r['id_produk'], 'kode' => $r['kode_kesimpulan'], 'keputusan' => $r['kesimpulan'],
+                                        'tanggal_order' => $r['tanggal_order'], 'qty' => (int) $r['qty_saran'], 'cf' => (float) $r['cf']],
+            rows("SELECT id_produk, kode_kesimpulan, kesimpulan, tanggal_order, qty_saran, cf FROM v_es_order_terbaru")),
+        'permintaan' => array_map(fn($r) => ['id_produk' => (int) $r['id_produk'], 'n' => (int) $r['n']],
+            rows("SELECT id_produk, COUNT(*) n FROM es_permintaan WHERE status != 'selesai' GROUP BY id_produk")),
+    ] : null;
+
+    echo json_encode(['ok' => true, 'waktu' => date('Y-m-d H:i:s'), 'tps' => $tps, 'mis' => $mis, 'oas' => $oas, 'kms' => $kms, 'es' => $es,
         'produk' => $produk_rinci, 'pegawai' => $pegawai, 'jam' => $jam,
         'keranjang' => ['transaksi' => $nTrx, 'pasangan' => $pasangan]],
         JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
