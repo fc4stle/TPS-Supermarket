@@ -65,6 +65,7 @@ echo hero('Selamat bekerja, ' . e(explode(' ', me()['nama'])[0]) . '! 🌿', 'Pa
 <div class="quicks">
   <?= quick('📈', 'MIS · Kinerja Perusahaan', 'Dashboard eksekutif dari TPS, OAS, KMS', 'mis/index.php', 'p') ?>
   <?= quick('🧭', 'DSS · Pusat Keputusan', '6 kasus keputusan: supplier, restok, promo, bundling, pegawai, shift (SSO)', 'sso_dss.php', 't') ?>
+  <?php if (es_tersedia()) echo quick('🧠', 'ES · Keputusan Waktu Order', 'Kapan order barang ke supplier, beserta alasannya', 'es/order.php', 'r'); ?>
   <?= quick('📊', 'Laporan TPS', 'Penjualan, produk, dan kasir', 'tps/laporan.php', 'y') ?>
   <?= quick('📋', 'OAS', 'Tugas dan pengumuman internal', 'oas/tugas.php', 'b') ?>
   <?= quick('📚', 'Knowledge Center', 'Akses pengetahuan organisasi', 'kms/index.php', 'g') ?>

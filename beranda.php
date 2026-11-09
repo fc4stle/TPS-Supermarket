@@ -30,6 +30,12 @@ if ($dss) {
     $dssAngka = [['Supplier aktif', (string) $dss['supplier_aktif']], ['Keputusan tersimpan', (string) $dss['keputusan']],
                  ['Keputusan terakhir', $t ? e($t['pemenang_nama']) . ' <small>(' . e($t['kategori']) . ')</small>' : '–']];
 }
+$esAngka = [];
+if (es_tersedia()) {
+    $esR = es_ringkasan();
+    $esAngka = [['Konsultasi hari ini', (string) $esR['konsultasi_hari_ini']], ['Permintaan pembeli tertunda', count($esR['permintaan_tertunda']) . ' produk']];
+    if (is_boss()) $esAngka[] = ['Harus order hari ini', (string) count(array_filter($esR['order_mendesak'], fn($o) => $o['kesimpulan'] === 'Order hari ini')) . ' produk'];
+}
 $omzet7 = $manajer ? (float) val('SELECT COALESCE(SUM(total),0) FROM transaksi WHERE DATE(waktu)>=CURDATE()-INTERVAL 6 DAY') : 0;
 
 $modul = [
@@ -47,12 +53,14 @@ $modul = [
         'mis/index.php', $manajer, 'Khusus manajer'],
     ['DSS', 'Decision Support', '🧭', 't', '6 kasus keputusan (supplier, restok, promo, bundling, pegawai terbaik, kasir per shift) dari data TPS, OAS, KMS, dan MIS. Aplikasi Flask terpisah (port ' . DSS_PORT . '), masuk otomatis lewat SSO.',
         $dssAngka, 'sso_dss.php', $bolehDss, 'Manajer & admin'],
+    ['ES', 'Expert System', '🧠', 'r', 'Sistem pakar: saran produk paling tepat untuk pembeli dan keputusan kapan order barang untuk manajer, dari data TPS, OAS, KMS, MIS, dan DSS.',
+        $esAngka, is_boss() ? 'es/order.php' : 'es/konsultasi.php', es_tersedia(), 'Database ES belum diimpor'],
 ];
 
 page_start('Beranda MartOffice', 'beranda', 'Sistem terpadu supermarket — pilih modul untuk mulai bekerja.');
-echo hero('Lima modul, satu sistem 🛒', 'MartOffice menyatukan transaksi kasir (TPS), administrasi kantor (OAS), pusat pengetahuan (KMS), informasi manajemen (MIS), dan pendukung keputusan (DSS).', '🧾📋📚📈🧭');
+echo hero('Enam modul, satu sistem 🛒', 'MartOffice menyatukan transaksi kasir (TPS), administrasi kantor (OAS), pusat pengetahuan (KMS), informasi manajemen (MIS), pendukung keputusan (DSS), dan sistem pakar (ES).', '🧾📋📚📈🧭🧠');
 ?>
-<div class="modules">
+<div class="modules six">
   <?php foreach ($modul as [$kode, $nama, $ic, $tone, $desk, $angka, $href, $boleh, $kunci]): ?>
     <section class="module <?= $tone ?> <?= $boleh ? '' : 'locked' ?>">
       <div class="module-top">
@@ -66,7 +74,7 @@ echo hero('Lima modul, satu sistem 🛒', 'MartOffice menyatukan transaksi kasir
       <?php elseif ($kode === 'DSS' && $boleh): ?>
         <p class="module-note">💤 DSS sedang tidak aktif. Klik tombol di bawah — DSS akan <b>dinyalakan otomatis</b> (±5 detik), tanpa perlu membuka Command Prompt.</p>
       <?php else: ?>
-        <p class="module-note">Modul ini hanya dapat dibuka oleh akun dengan role <b><?= $kode === 'DSS' ? 'manajer atau admin' : 'manajer' ?></b>.</p>
+        <p class="module-note"><?= $kode === 'ES' ? 'Impor <b>es_database.sql</b> ke database martoffice agar modul ini aktif.' : 'Modul ini hanya dapat dibuka oleh akun dengan role <b>' . ($kode === 'DSS' ? 'manajer atau admin' : 'manajer') . '</b>.' ?></p>
       <?php endif; ?>
       <?php if ($boleh): ?>
         <a class="btn block" href="<?= url($href) ?>"<?= $kode === 'DSS' ? ' onclick="this.textContent=\'⏳ Membuka DSS…\';this.style.pointerEvents=\'none\'"' : '' ?>><?= $kode === 'DSS' ? '🔐 Buka DSS (SSO) ↗' : 'Buka modul →' ?></a>
@@ -84,8 +92,9 @@ echo hero('Lima modul, satu sistem 🛒', 'MartOffice menyatukan transaksi kasir
     <div><b>📋 OAS</b><small>mengatur tugas &amp; dokumen</small></div><span>→</span>
     <div><b>📚 KMS</b><small>menyimpan SOP &amp; pengetahuan</small></div><span>→</span>
     <div><b>📈 MIS</b><small>merangkum semuanya untuk manajer</small></div><span>→</span>
-    <div class="hl"><b>🧭 DSS</b><small>6 kasus keputusan dari data TPS, OAS, KMS, MIS</small></div>
+    <div class="hl"><b>🧭 DSS</b><small>6 kasus keputusan dari data TPS, OAS, KMS, MIS</small></div><span>→</span>
+    <div class="hl"><b>🧠 ES</b><small>saran produk &amp; waktu order dari semua modul</small></div>
   </div>
-  <p class="hint mb0" style="margin-top:12px">TPS, OAS, KMS, dan MIS memakai satu database MySQL. DSS adalah aplikasi Flask + SQLite terpisah di port <?= DSS_PORT ?> yang terhubung lewat <b>Single Sign-On</b> dan API bertanda tangan HMAC.</p>
+  <p class="hint mb0" style="margin-top:12px">TPS, OAS, KMS, dan MIS memakai satu database MySQL. DSS adalah aplikasi Flask + SQLite terpisah di port <?= DSS_PORT ?> yang terhubung lewat <b>Single Sign-On</b> dan API bertanda tangan HMAC. ES memakai database MySQL yang sama dan mengambil hasil DSS lewat API.</p>
 </div>
 <?php page_end();

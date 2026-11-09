@@ -86,6 +86,15 @@ Agar grafik dan perbandingan periode di MIS terisi, jalankan `data_simulasi.sql`
 **Back end:** `includes/es.php` (mesin forward chaining + Certainty Factor) dan `api/es.php` (API JSON, wajib login MartOffice; POST wajib token CSRF). Aksi utama:
 `?aksi=pertanyaan`, `?aksi=coba&fakta=F01,F08,F11,F14,F17`, `POST ?aksi=konsultasi`, `POST ?aksi=order` (manajer), `?aksi=order`, `?aksi=order_produk&id=`, `POST ?aksi=order_tugaskan`, `POST ?aksi=permintaan_tugaskan`, `POST ?aksi=sinkron_dss`, `?aksi=basis&menu=ORDER`, `?aksi=ringkasan`.
 
+**Front end** (menu sidebar **ES · Sistem Pakar**, semua data diambil dari `api/es.php` oleh `assets/js/es.js`):
+
+| Halaman | Role | Isi |
+|---|---|---|
+| `es/konsultasi.php` · Konsultasi Produk | semua | 5 pertanyaan satu per satu + tingkat keyakinan → rekomendasi produk (CF, alasan, stok TPS, promo/bundling DSS), produk habis jadi permintaan, penelusuran aturan + sumber KMS |
+| `es/order.php` · Keputusan Waktu Order | manajer, admin | jalankan analisis, sinkron DSS, ringkasan K01–K06, tabel keputusan, detail perhitungan per produk, buat tugas order di OAS |
+| `es/riwayat.php` · Riwayat Konsultasi | semua (tugaskan: manajer/admin) | daftar & detail konsultasi, permintaan pembeli → tugas OAS gudang |
+| `es/basis.php` · Basis Pengetahuan | semua | pertanyaan → fakta, fakta otomatis + sumber modul, aturan JIKA–MAKA, kesimpulan, parameter engine |
+
 **Integrasi:** keputusan order dan permintaan pembeli menjadi tugas `[ES]` di OAS untuk staf gudang; MIS Executive Dashboard dan Pusat Peringatan menampilkan hasil ES; DSS mengirim lead time/promo/bundling lewat `/api/es` dan menampilkan keputusan ES di halaman Rekomendasi Restok.
 
 ## Akun

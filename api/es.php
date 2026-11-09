@@ -13,6 +13,7 @@
  *  POST ?aksi=order                     menu 2: analisis waktu order semua produk (manajer)
  *  GET  ?aksi=order                     hasil analisis order terbaru
  *  GET  ?aksi=order_produk&id=          fakta, aturan, dan keputusan order satu produk (tanpa menyimpan)
+ *  GET  ?aksi=order_detail&id=          detail satu hasil analisis tersimpan (fakta + bukti, aturan, CF per kesimpulan)
  *  POST ?aksi=order_tugaskan            keputusan order → tugas OAS staf gudang
  *  POST ?aksi=sinkron_dss               ambil hasil DSS (supplier, lead time, promo, bundling)
  *  GET  ?aksi=ringkasan                 ringkasan untuk MIS/DSS (sesi login atau HMAC "es:ringkasan")
@@ -130,7 +131,7 @@ switch ($aksi) {
         }
         json_out(['ok' => true, 'analisis_terakhir' => val('SELECT MAX(dianalisis) FROM es_order_analisis'),
             'hasil' => rows('SELECT id id_analisis, id_produk, sku, nama, kategori, kode_kesimpulan, kesimpulan, tindakan, cf, tanggal_order, qty_saran, satuan,
-                                    stok, rata_harian, sisa_hari, lead_hari, supplier, aturan, alasan, status, id_tugas, dianalisis
+                                    stok, rata_harian, sisa_hari, lead_hari, supplier, aturan, alasan, status, id_tugas, dianalisis, prioritas, warna
                              FROM v_es_order_terbaru ORDER BY prioritas, tanggal_order, nama')]);
 
     case 'order_produk':
@@ -145,6 +146,32 @@ switch ($aksi) {
             'aturan_aktif' => array_map(fn($a) => ['kode' => $a['kode'], 'kesimpulan' => $a['kode_kesimpulan'], 'cf_pakar' => $a['cf_pakar'], 'penjelasan' => $a['penjelasan']], $inf['aturan']),
             'cf_per_kesimpulan' => $inf['cf_semua'], 'keputusan' => $kes[$inf['kesimpulan']] + ['kode' => $inf['kesimpulan'], 'cf' => $inf['cf']],
             'tanggal_order' => $tgl, 'qty_saran' => $qty]);
+
+    case 'order_detail':
+        // detail satu hasil analisis yang tersimpan: perhitungan, fakta + bukti, aturan aktif, CF per kesimpulan
+        wajib_role('manajer', 'admin');
+        $a = row('SELECT v.*, a.dibuat_oleh, g.nama oleh FROM v_es_order_terbaru v JOIN es_order_analisis a ON a.id=v.id
+                  LEFT JOIN pegawai g ON g.id=a.dibuat_oleh WHERE v.id=?', [(int) get('id')])
+            ?: row('SELECT v.*, k.nama kesimpulan, k.tindakan, k.prioritas, k.warna, p.sku, p.nama, p.kategori, p.satuan, g.nama oleh
+                    FROM es_order_analisis v JOIN produk p ON p.id=v.id_produk JOIN es_kesimpulan k ON k.kode=v.kode_kesimpulan
+                    LEFT JOIN pegawai g ON g.id=v.dibuat_oleh WHERE v.id=?', [(int) get('id')]);
+        if (!$a) json_out(['ok' => false, 'pesan' => 'Hasil analisis tidak ditemukan'], 404);
+        $kodeAturan = array_filter(array_map('trim', explode(',', (string) $a['aturan'])), fn($k) => $k !== '-');
+        $aturan = $kodeAturan ? array_values(array_filter(es_aturan('ORDER'), fn($r) => in_array($r['kode'], $kodeAturan, true))) : [];
+        $per = [];
+        foreach ($aturan as $r) $per[$r['kode_kesimpulan']][] = $r['cf_pakar'];
+        $kes = array_column(rows("SELECT k.kode, k.nama, k.prioritas, k.warna FROM es_kesimpulan k JOIN es_menu m ON m.id=k.id_menu WHERE m.kode='ORDER' ORDER BY k.prioritas"), null, 'kode');
+        $cfKes = [];
+        foreach ($per as $k => $cf) $cfKes[] = ['kode' => $k, 'nama' => $kes[$k]['nama'] ?? $k, 'warna' => $kes[$k]['warna'] ?? 'n', 'cf' => round(es_cf_gabung($cf), 4), 'jumlah_aturan' => count($cf)];
+        usort($cfKes, fn($x, $y) => $y['cf'] <=> $x['cf'] ?: ($kes[$x['kode']]['prioritas'] ?? 9) <=> ($kes[$y['kode']]['prioritas'] ?? 9));
+        $set = es_set();
+        $segar = in_array($a['kategori'], ES_MUDAH_RUSAK, true);
+        json_out(['ok' => true, 'analisis' => $a,
+            'perhitungan' => ['stok_aman' => $set['stok_aman'], 'siklus' => $segar ? min($set['siklus'], $set['siklus_segar']) : $set['siklus'], 'segar' => $segar],
+            'fakta' => rows('SELECT o.kode_fakta kode, f.nama, f.sumber, f.cara, o.nilai bukti FROM es_order_fakta o JOIN es_fakta f ON f.kode=o.kode_fakta WHERE o.id_analisis=? ORDER BY o.kode_fakta', [(int) $a['id']]),
+            'aturan' => array_map(fn($r) => ['kode' => $r['kode'], 'syarat' => $r['syarat'], 'kesimpulan' => $r['kode_kesimpulan'], 'cf_pakar' => $r['cf_pakar'],
+                                             'penjelasan' => $r['penjelasan'], 'sumber_kms' => $r['sumber_kms']], $aturan),
+            'cf_per_kesimpulan' => $cfKes]);
 
     case 'order_tugaskan':
         wajib_post();

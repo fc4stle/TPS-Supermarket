@@ -22,6 +22,7 @@ echo hero('Hai, ' . e(explode(' ', me()['nama'])[0]) . '! Siap melayani hari ini
 
 <div class="quicks">
   <?= quick('🧾', 'Buka Kasir', 'Catat transaksi pelanggan', 'tps/kasir.php', 'g') ?>
+  <?php if (es_tersedia()) echo quick('🧠', 'Konsultasi Produk (ES)', 'Sarankan produk sesuai kebutuhan pembeli', 'es/konsultasi.php', 'r'); ?>
   <?= quick('📚', 'Knowledge Center', 'Cari SOP, panduan, dan solusi', 'kms/index.php', 'y') ?>
   <?= quick('✍️', 'Kontribusi Knowledge', 'Bagi skill dan tips untuk tim', 'kms/tulis.php', 'o') ?>
   <?= quick('📁', 'Dokumen', 'Formulir dan arsip toko', 'oas/dokumen.php', 'b') ?>
