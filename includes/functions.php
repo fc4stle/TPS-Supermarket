@@ -92,7 +92,7 @@ function status_badge(string $s): string
         'tunai' => ['Tunai', 'g'], 'debit' => ['Debit', 'b'], 'qris' => ['QRIS', 'p'],
         'rendah' => ['Rendah', 'n'], 'sedang' => ['Sedang', 'y'], 'tinggi' => ['Tinggi', 'r'],
         'internal' => ['Internal', 'n'], 'terbatas' => ['Terbatas', 'p'],
-        'admin' => ['Admin', 'p'], 'manajer' => ['Manajer', 'b'], 'staff' => ['Staff', 'g'],
+        'admin' => ['Admin', 'p'], 'manajer' => ['Manajer', 'b'], 'staff' => ['Staff', 'g'], 'pembeli' => ['Pembeli', 'o'],
     ];
     [$t, $c] = $map[$s] ?? [$s, 'n'];
     return badge($t, $c);
@@ -162,9 +162,10 @@ function me(): ?array { return $GLOBALS['ME'] ?? null; }
 function uid(): int { return (int) (me()['id'] ?? 0); }
 function role(): string { return me()['role'] ?? ''; }
 function is_boss(): bool { return in_array(role(), ['admin', 'manajer'], true); }
+function is_pembeli(): bool { return role() === 'pembeli'; }
 function home_url(string $role = ''): string
 {
-    return ['admin' => 'admin/dashboard.php', 'manajer' => 'manajer/dashboard.php', 'staff' => 'staff/dashboard.php'][$role ?: role()] ?? 'login.php';
+    return ['admin' => 'admin/dashboard.php', 'manajer' => 'manajer/dashboard.php', 'staff' => 'staff/dashboard.php', 'pembeli' => 'es/konsultasi.php'][$role ?: role()] ?? 'login.php';
 }
 function need(string ...$roles): void
 {

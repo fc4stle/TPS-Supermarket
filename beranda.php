@@ -34,7 +34,7 @@ $esAngka = [];
 if (es_tersedia()) {
     $esR = es_ringkasan();
     $esAngka = [['Konsultasi hari ini', (string) $esR['konsultasi_hari_ini']], ['Permintaan pembeli tertunda', count($esR['permintaan_tertunda']) . ' produk']];
-    if (is_boss()) $esAngka[] = ['Harus order hari ini', (string) count(array_filter($esR['order_mendesak'], fn($o) => $o['kesimpulan'] === 'Order hari ini')) . ' produk'];
+    if ($manajer) $esAngka[] = ['Harus order hari ini', (string) count(array_filter($esR['order_mendesak'], fn($o) => $o['kesimpulan'] === 'Order hari ini')) . ' produk'];
 }
 $omzet7 = $manajer ? (float) val('SELECT COALESCE(SUM(total),0) FROM transaksi WHERE DATE(waktu)>=CURDATE()-INTERVAL 6 DAY') : 0;
 
@@ -54,7 +54,7 @@ $modul = [
     ['DSS', 'Decision Support', '🧭', 't', '6 kasus keputusan (supplier, restok, promo, bundling, pegawai terbaik, kasir per shift) dari data TPS, OAS, KMS, dan MIS. Aplikasi Flask terpisah (port ' . DSS_PORT . '), masuk otomatis lewat SSO.',
         $dssAngka, 'sso_dss.php', $bolehDss, 'Manajer & admin'],
     ['ES', 'Expert System', '🧠', 'r', 'Sistem pakar: saran produk paling tepat untuk pembeli dan keputusan kapan order barang untuk manajer, dari data TPS, OAS, KMS, MIS, dan DSS.',
-        $esAngka, is_boss() ? 'es/order.php' : 'es/konsultasi.php', es_tersedia(), 'Database ES belum diimpor'],
+        $esAngka, $manajer ? 'es/order.php' : 'es/konsultasi.php', es_tersedia(), 'Database ES belum diimpor'],
 ];
 
 page_start('Beranda MartOffice', 'beranda', 'Sistem terpadu supermarket — pilih modul untuk mulai bekerja.');

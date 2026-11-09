@@ -41,7 +41,7 @@ if ($tab === 'tulis' && get('balas')) {
     $b = row('SELECT * FROM pesan WHERE id=? AND (id_pengirim=? OR id_penerima=?)', [(int) get('balas'), $me, $me]);
     if ($b) $pre = ['ke' => (int) ($b['id_pengirim'] == $me ? $b['id_penerima'] : $b['id_pengirim']), 'subjek' => (str_starts_with($b['subjek'], 'Re: ') ? '' : 'Re: ') . $b['subjek'], 'isi' => '', 'balas' => (int) $b['id']];
 }
-$penerima = rows('SELECT id,nama,role,jabatan FROM pegawai WHERE aktif=1 AND id!=? ORDER BY role,nama', [$me]);
+$penerima = rows('SELECT id,nama,role,jabatan FROM pegawai WHERE aktif=1 AND role!=\'pembeli\' AND id!=? ORDER BY role,nama', [$me]);
 
 page_start('Pesan Internal', 'pesan', 'Komunikasi antar pegawai tanpa keluar dari MartOffice.');
 ?>

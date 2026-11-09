@@ -55,6 +55,10 @@ $GLOBALS['ME'] = !empty($_SESSION['uid'])
 $aksi = get('aksi', 'menu');
 $hmac = $aksi === 'ringkasan' && api_valid('es:ringkasan');
 if (!me() && !$hmac) json_out(['ok' => false, 'pesan' => 'Silakan login MartOffice terlebih dahulu'], 401);
+// akun pembeli hanya memakai menu rekomendasi dan hanya melihat konsultasinya sendiri
+$pembeli = me() && role() === 'pembeli';
+if ($pembeli && !in_array($aksi, ['token', 'menu', 'pertanyaan', 'coba', 'konsultasi', 'riwayat'], true))
+    json_out(['ok' => false, 'pesan' => 'Akun pembeli hanya dapat memakai Konsultasi Produk'], 403);
 
 function wajib_post(): void
 {
@@ -92,6 +96,7 @@ switch ($aksi) {
         json_out(['ok' => true, 'menu' => get('menu', 'REKOMENDASI'), 'pertanyaan' => es_pertanyaan(get('menu', 'REKOMENDASI'))]);
 
     case 'basis':
+        if (role() === 'pembeli') json_out(['ok' => false, 'pesan' => 'Basis pengetahuan hanya untuk pegawai'], 403);
         $m = pilih(get('menu', 'REKOMENDASI'), ['REKOMENDASI', 'ORDER'], 'REKOMENDASI');
         json_out(['ok' => true, 'menu' => $m,
             'fakta' => rows('SELECT f.kode, f.nama, f.sumber, f.otomatis, f.cara FROM es_fakta f JOIN es_menu m ON m.id=f.id_menu WHERE m.kode=? ORDER BY f.kode', [$m]),
@@ -105,26 +110,27 @@ switch ($aksi) {
     case 'konsultasi':
         if (is_post()) {
             wajib_post();
-            $r = es_konsultasi_simpan(uid(), baca_jawaban(), post('nama_pelanggan'), post('catatan'));
+            $r = es_konsultasi_simpan(uid(), baca_jawaban(), $pembeli ? me()['nama'] : post('nama_pelanggan'), post('catatan'));
             json_out(['ok' => true, 'disimpan' => true] + $r, 201);
         }
         $k = es_konsultasi_detail((int) get('id'));
+        if ($k && $pembeli && (int) $k['id_pegawai'] !== uid()) $k = null;
         $k ? json_out(['ok' => true, 'konsultasi' => $k]) : json_out(['ok' => false, 'pesan' => 'Konsultasi tidak ditemukan'], 404);
 
     case 'riwayat':
         json_out(['ok' => true, 'riwayat' => rows('SELECT k.id, k.waktu, k.nama_pelanggan, g.nama pegawai,
                 (SELECT GROUP_CONCAT(f.nama ORDER BY f.kode SEPARATOR " · ") FROM es_konsultasi_fakta kf JOIN es_fakta f ON f.kode=kf.kode_fakta WHERE kf.id_konsultasi=k.id) kebutuhan,
                 (SELECT COUNT(*) FROM es_konsultasi_hasil h WHERE h.id_konsultasi=k.id) produk,
-                (SELECT COUNT(*) FROM es_permintaan r WHERE r.id_konsultasi=k.id) habis
-            FROM es_konsultasi k JOIN pegawai g ON g.id=k.id_pegawai ORDER BY k.id DESC LIMIT 50')]);
+                (SELECT COUNT(*) FROM es_permintaan r WHERE r.id_konsultasi=k.id) habis, g.role
+            FROM es_konsultasi k JOIN pegawai g ON g.id=k.id_pegawai' . ($pembeli ? ' WHERE k.id_pegawai=' . uid() : '') . ' ORDER BY k.id DESC LIMIT 50')]);
 
     case 'permintaan_tugaskan':
         wajib_post();
-        wajib_role('manajer', 'admin');
+        wajib_role('manajer');
         json_out(['ok' => true] + es_permintaan_tugaskan(uid()));
 
     case 'order':
-        wajib_role('manajer', 'admin');
+        wajib_role('manajer');
         if (is_post()) {
             wajib_post();
             json_out(['ok' => true] + es_order_jalankan(uid()), 201);
@@ -135,7 +141,7 @@ switch ($aksi) {
                              FROM v_es_order_terbaru ORDER BY prioritas, tanggal_order, nama')]);
 
     case 'order_produk':
-        wajib_role('manajer', 'admin');
+        wajib_role('manajer');
         $p = row('SELECT id, sku, nama, kategori, satuan, harga, stok FROM produk WHERE id=? AND aktif=1', [(int) get('id')]);
         if (!$p) json_out(['ok' => false, 'pesan' => 'Produk tidak ditemukan'], 404);
         $kes = array_column(rows('SELECT kode, nama, tindakan, prioritas FROM es_kesimpulan'), null, 'kode');
@@ -149,7 +155,7 @@ switch ($aksi) {
 
     case 'order_detail':
         // detail satu hasil analisis yang tersimpan: perhitungan, fakta + bukti, aturan aktif, CF per kesimpulan
-        wajib_role('manajer', 'admin');
+        wajib_role('manajer');
         $a = row('SELECT v.*, a.dibuat_oleh, g.nama oleh FROM v_es_order_terbaru v JOIN es_order_analisis a ON a.id=v.id
                   LEFT JOIN pegawai g ON g.id=a.dibuat_oleh WHERE v.id=?', [(int) get('id')])
             ?: row('SELECT v.*, k.nama kesimpulan, k.tindakan, k.prioritas, k.warna, p.sku, p.nama, p.kategori, p.satuan, g.nama oleh
@@ -175,13 +181,13 @@ switch ($aksi) {
 
     case 'order_tugaskan':
         wajib_post();
-        wajib_role('manajer', 'admin');
+        wajib_role('manajer');
         $ids = array_map('intval', (array) ($_POST['id'] ?? []));
         json_out(['ok' => true] + es_order_tugaskan(uid(), array_filter($ids)));
 
     case 'sinkron_dss':
         wajib_post();
-        wajib_role('manajer', 'admin');
+        wajib_role('manajer');
         $r = es_sinkron_dss();
         json_out(['ok' => $r['ok']] + $r, $r['ok'] ? 200 : 503);
 

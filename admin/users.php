@@ -8,7 +8,7 @@ if (is_post()) {
 
     if ($aksi === 'simpan') {
         $nama = post('nama'); $username = strtolower(post('username')); $jabatan = post('jabatan');
-        $role = pilih(post('role'), ['admin', 'manajer', 'staff'], '');
+        $role = pilih(post('role'), ['admin', 'manajer', 'staff', 'pembeli'], '');
         $pass = (string) ($_POST['password'] ?? '');
         $err = [];
         if ($nama === '' || $username === '' || !$role) $err[] = 'Nama, username, dan role wajib diisi.';
@@ -43,7 +43,7 @@ if (is_post()) {
     }
 }
 
-$fr = pilih(get('role'), ['admin', 'manajer', 'staff'], '');
+$fr = pilih(get('role'), ['admin', 'manajer', 'staff', 'pembeli'], '');
 $users = rows('SELECT p.*,
     (SELECT COUNT(*) FROM transaksi t WHERE t.id_kasir=p.id) trx,
     (SELECT COUNT(*) FROM artikel_kms a WHERE a.id_penulis=p.id) kms
@@ -63,6 +63,7 @@ page_start('User & Role', 'users', 'Kelola akun pegawai dan hak akses setiap rol
   <?= stat_card('Administrator', angka($jml['admin'] ?? 0), '🛡️', 'p', 'admin/users.php?role=admin') ?>
   <?= stat_card('Manajer', angka($jml['manajer'] ?? 0), '🧑‍💼', 'b', 'admin/users.php?role=manajer') ?>
   <?= stat_card('Staff', angka($jml['staff'] ?? 0), '🧑‍🍳', 'g', 'admin/users.php?role=staff') ?>
+  <?= stat_card('Pembeli', angka($jml['pembeli'] ?? 0), '🛍️', 'o', 'admin/users.php?role=pembeli') ?>
 </div>
 
 <div class="grid g-form">
@@ -76,7 +77,7 @@ page_start('User & Role', 'users', 'Kelola akun pegawai dan hak akses setiap rol
         <label>Jabatan</label><input name="jabatan" value="<?= e($edit['jabatan'] ?? '') ?>" placeholder="mis. Kasir, Store Manager">
         <label>Role</label>
         <div class="radio-row">
-          <?php foreach (['admin' => '🛡️ Admin', 'manajer' => '🧑‍💼 Manajer', 'staff' => '🧑‍🍳 Staff'] as $k => $v): ?>
+          <?php foreach (['admin' => '🛡️ Admin', 'manajer' => '🧑‍💼 Manajer', 'staff' => '🧑‍🍳 Staff', 'pembeli' => '🛍️ Pembeli'] as $k => $v): ?>
             <label class="radio-card"><input type="radio" name="role" value="<?= $k ?>" <?= ($edit['role'] ?? 'staff') === $k ? 'checked' : '' ?>> <?= $v ?></label>
           <?php endforeach; ?>
         </div>
@@ -98,7 +99,7 @@ page_start('User & Role', 'users', 'Kelola akun pegawai dan hak akses setiap rol
 
   <div class="card tight">
     <div class="card-h"><h3>👥 Daftar Pegawai</h3>
-      <div class="chips"><?php foreach (['' => 'Semua', 'admin' => 'Admin', 'manajer' => 'Manajer', 'staff' => 'Staff'] as $k => $v) echo '<a class="chip ' . ($fr === $k ? 'on' : '') . '" href="?role=' . $k . '">' . $v . '</a>'; ?></div></div>
+      <div class="chips"><?php foreach (['' => 'Semua', 'admin' => 'Admin', 'manajer' => 'Manajer', 'staff' => 'Staff', 'pembeli' => 'Pembeli'] as $k => $v) echo '<a class="chip ' . ($fr === $k ? 'on' : '') . '" href="?role=' . $k . '">' . $v . '</a>'; ?></div></div>
     <div class="table-wrap" style="margin-top:12px">
     <table><thead><tr><th>Pegawai</th><th>Role</th><th class="num">Transaksi</th><th class="num">Knowledge</th><th>Status</th><th></th></tr></thead><tbody>
       <?php foreach ($users as $x): ?>

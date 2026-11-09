@@ -9,6 +9,7 @@
   if (!root) return;
   var API = root.dataset.api, TOKEN = root.dataset.token, PAGE = root.dataset.page;
   var CF_MIN = parseFloat(root.dataset.cfMin || '0.4');
+  var PEMBELI = root.dataset.pembeli === '1', NAMA = root.dataset.nama || '';
   var BASE = root.dataset.base || '';
 
   /* ---------------- helper ---------------- */
@@ -95,7 +96,7 @@
             return '<label class="es-opt"><input type="radio" name="opt" value="' + esc(p.kode_fakta) + '"' + (a.fakta === p.kode_fakta ? ' checked' : '')
               + '><span>' + esc(p.label) + '<small>Fakta ' + esc(p.kode_fakta) + '</small></span></label>';
           }).join('') + '</div>'
-          + '<div class="es-yakin"><b>Seberapa yakin pembeli dengan jawaban ini?</b>' + YAKIN.map(function (y) {
+          + '<div class="es-yakin"><b>' + (PEMBELI ? 'Seberapa yakin Anda dengan jawaban ini?' : 'Seberapa yakin pembeli dengan jawaban ini?') + '</b>' + YAKIN.map(function (y) {
             var on = (a.cf || 1) === y[0];
             return '<button type="button" class="chip' + (on ? ' on' : '') + '" data-cf="' + y[0] + '">' + y[1] + ' (' + String(y[0]).replace('.', ',') + ')</button>';
           }).join('') + '</div>'
@@ -107,11 +108,11 @@
             var a = jawab[q.kode];
             return '<div><small>' + esc(q.pertanyaan) + '</small><b>' + (a ? esc(a.label) + ' <span class="muted">(' + esc(a.fakta) + ', CF ' + String(a.cf).replace('.', ',') + ')</span>' : '<span class="muted">dilewati</span>') + '</b></div>';
           }).join('') + '</div>'
-          + '<div class="row"><div><label for="es-nama">Nama pelanggan (opsional)</label><input id="es-nama" maxlength="80" placeholder="mis. Bu Rina"></div>'
+          + '<div class="row">' + (PEMBELI ? '<input type="hidden" id="es-nama" value="' + esc(NAMA) + '">' : '<div><label for="es-nama">Nama pelanggan (opsional)</label><input id="es-nama" maxlength="80" placeholder="mis. Bu Rina"></div>')
           + '<div><label for="es-cat">Catatan (opsional)</label><input id="es-cat" maxlength="255" placeholder="mis. untuk sarapan anak sekolah"></div></div>'
           + '<div class="es-nav"><button type="button" class="ghost" id="es-back">← Ubah jawaban</button><span class="actions">'
-          + '<button type="button" class="ghost" id="es-coba" title="Menjalankan engine tanpa menyimpan ke riwayat">🧪 Uji coba (tidak disimpan)</button>'
-          + '<button type="button" id="es-go">🔍 Cari rekomendasi & simpan</button></span></div>';
+          + (PEMBELI ? '' : '<button type="button" class="ghost" id="es-coba" title="Menjalankan engine tanpa menyimpan ke riwayat">🧪 Uji coba (tidak disimpan)</button>')
+          + '<button type="button" id="es-go">' + (PEMBELI ? '🔍 Cari produk yang cocok' : '🔍 Cari rekomendasi & simpan') + '</button></span></div>';
       }
       wiz.innerHTML = h;
       renderPanel();
@@ -208,7 +209,7 @@
 
       if (d.habis.length) {
         h += '<div class="card" style="margin-top:18px"><div class="card-h"><h3>📭 Cocok tetapi stok habis</h3>' + badge(d.habis.length + ' produk', 'r') + '</div>'
-          + '<p class="muted">' + (d.disimpan ? 'Produk ini sudah dicatat sebagai <b>permintaan pembeli</b>. Manajer dapat menugaskan staf gudang lewat menu Riwayat Konsultasi atau MIS, dan ES Keputusan Order ikut menghitungnya.' : 'Pada konsultasi yang disimpan, produk ini dicatat sebagai permintaan pembeli.') + '</p>'
+          + '<p class="muted">' + (PEMBELI ? 'Produk ini cocok untuk Anda tetapi sedang habis. Permintaan Anda sudah <b>diteruskan ke toko</b> agar segera disediakan.' : d.disimpan ? 'Produk ini sudah dicatat sebagai <b>permintaan pembeli</b>. Manajer dapat menugaskan staf gudang lewat menu Riwayat Konsultasi atau MIS, dan ES Keputusan Order ikut menghitungnya.' : 'Pada konsultasi yang disimpan, produk ini dicatat sebagai permintaan pembeli.') + '</p>'
           + '<div class="table-wrap"><table><thead><tr><th>Produk</th><th>Kategori</th><th class="num">Keyakinan</th><th>Alasan</th></tr></thead><tbody>'
           + d.habis.map(function (p) { return '<tr><td>' + esc(p.ikon || '') + ' <b>' + esc(p.nama) + '</b></td><td>' + esc(p.kategori) + '</td><td class="num">' + pct(p.cf_akhir) + '</td><td><small>' + p.alasan.map(esc).join('; ') + '</small></td></tr>'; }).join('')
           + '</tbody></table></div></div>';
@@ -244,7 +245,7 @@
       if (!d.riwayat.length) { list.innerHTML = empty('🕘', 'Belum ada konsultasi', 'Konsultasi yang disimpan dari menu Konsultasi Produk akan muncul di sini.'); det.innerHTML = ''; return; }
       list.innerHTML = '<div class="table-wrap"><table class="es-tbl"><thead><tr><th>#</th><th>Waktu</th><th>Pelanggan · kebutuhan</th><th class="num">Saran</th><th class="num">Habis</th></tr></thead><tbody>'
         + d.riwayat.map(function (r) {
-          return '<tr data-id="' + r.id + '"><td><b>' + r.id + '</b></td><td class="nowrap">' + tgl(r.waktu, true) + '<br><small>' + esc(r.pegawai) + '</small></td><td>' + esc(r.nama_pelanggan || 'Tanpa nama') + '<br><small>' + esc(ringkasKebutuhan(r.kebutuhan)) + '</small></td>'
+          return '<tr data-id="' + r.id + '"><td><b>' + r.id + '</b></td><td class="nowrap">' + tgl(r.waktu, true) + '<br><small>' + (r.role === 'pembeli' ? 'mandiri (akun pembeli)' : 'dilayani ' + esc(r.pegawai)) + '</small></td><td>' + esc(r.nama_pelanggan || 'Tanpa nama') + '<br><small>' + esc(ringkasKebutuhan(r.kebutuhan)) + '</small></td>'
             + '<td class="num">' + r.produk + '</td><td class="num">' + (num(r.habis) ? badge(r.habis, 'r') : '0') + '</td></tr>';
         }).join('') + '</tbody></table></div>';
       $$('tr[data-id]', list).forEach(function (tr) { tr.onclick = function () { buka(parseInt(tr.dataset.id, 10)); }; });
@@ -261,7 +262,7 @@
       api('konsultasi', { id: id }).then(function (d) {
         var k = d.konsultasi;
         var st = { baru: ['Baru', 'r'], ditugaskan: ['Ditugaskan ke gudang', 'y'], selesai: ['Sudah berstok', 'g'] };
-        det.innerHTML = '<div class="card-h"><h3>Konsultasi #' + k.id + (k.nama_pelanggan ? ' · ' + esc(k.nama_pelanggan) : '') + '</h3><small>' + tgl(k.waktu, true) + ' · ' + esc(k.pegawai) + '</small></div>'
+        det.innerHTML = '<div class="card-h"><h3>Konsultasi #' + k.id + (k.nama_pelanggan ? ' · ' + esc(k.nama_pelanggan) : '') + '</h3><small>' + tgl(k.waktu, true) + ' · ' + (k.role_pegawai === 'pembeli' ? 'konsultasi mandiri' : 'dilayani ' + esc(k.pegawai)) + '</small></div>'
           + (k.catatan ? '<p class="muted">📝 ' + esc(k.catatan) + '</p>' : '')
           + '<b>Fakta dari jawaban pembeli</b><div class="es-trace" style="margin:8px 0 16px">' + k.fakta.map(function (f) {
             return '<div class="es-fk"><code>' + esc(f.kode_fakta) + '</code><span>' + esc(f.nama) + '</span><em>CF ' + dec(f.cf_pengguna, 2) + '</em></div>';
@@ -407,6 +408,10 @@
       api('order_detail', { id: id }).then(function (d) {
         var a = d.analisis, c = d.perhitungan, sisa = a.sisa_hari == null ? null : num(a.sisa_hari);
         var batas = num(a.lead_hari) + num(c.stok_aman);
+        // jarak hari dari tanggal analisis ke tanggal order, untuk menampilkan stok saat order
+        var hariOrder = a.tanggal_order ? Math.round((new Date(a.tanggal_order + 'T00:00:00') - new Date(String(a.dianalisis).slice(0, 10) + 'T00:00:00')) / 864e5) : 0;
+        var stokOrder = Math.max(0, num(a.stok) - num(a.rata_harian) * hariOrder);
+        var target = num(a.rata_harian) * (num(a.lead_hari) + num(c.stok_aman) + num(c.siklus));
         var maxCf = Math.max.apply(null, d.cf_per_kesimpulan.map(function (x) { return x.cf; }).concat([0.0001]));
         var h = '<div class="es-mh"><div><small>' + esc(a.sku) + ' · ' + esc(a.kategori) + ' · dianalisis ' + tgl(a.dianalisis, true) + '</small><h2>' + esc(a.nama) + '</h2></div><button type="button" class="ghost sm" id="es-mx">✕ Tutup</button></div>'
           + '<div class="card"><div class="card-h"><h3>Keputusan</h3>' + badge(a.kesimpulan, a.warna) + '</div>'
@@ -441,7 +446,9 @@
           + '<div class="es-rumus">CF gabungan = 1 − Π(1 − CF aturan). Kesimpulan dengan CF tertinggi dipilih; bila sama, yang paling mendesak.</div></div>'
 
           + (num(a.qty_saran) ? '<div class="card"><div class="card-h"><h3>5 · Hitungan jumlah pesan</h3></div><div class="es-rumus">'
-            + 'Jumlah = ⌈rata jual × (lead + aman + siklus) − stok saat order⌉<br>= ⌈' + dec(a.rata_harian, 2) + ' × (' + dec(a.lead_hari, 0) + ' + ' + dec(c.stok_aman, 0) + ' + ' + dec(c.siklus, 0) + ') − stok saat order⌉ = <b>' + a.qty_saran + ' ' + esc(a.satuan) + '</b></div></div>' : '');
+            + 'Jumlah = ⌈rata jual × (lead + aman + siklus) − stok saat order⌉<br>'
+            + 'Stok saat order = stok − rata jual × ' + hariOrder + ' hari = ' + a.stok + ' − ' + dec(a.rata_harian, 2) + ' × ' + hariOrder + ' = ' + dec(stokOrder, 2) + '<br>'
+            + 'Jumlah = ⌈' + dec(a.rata_harian, 2) + ' × (' + dec(a.lead_hari, 0) + ' + ' + dec(c.stok_aman, 0) + ' + ' + dec(c.siklus, 0) + ') − ' + dec(stokOrder, 2) + '⌉ = ⌈' + dec(target - stokOrder, 2) + '⌉ = <b>' + a.qty_saran + ' ' + esc(a.satuan) + '</b></div></div>' : '');
         m.firstChild.innerHTML = h;
         $('#es-mx', m).onclick = function () { m.remove(); };
       }).catch(function (e) { alertBox(m.firstChild, 'err', esc(e.message)); });

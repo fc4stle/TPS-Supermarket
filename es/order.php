@@ -2,7 +2,7 @@
 /* ES Menu 2 · Keputusan waktu order barang untuk manajer. */
 require __DIR__ . '/../includes/app.php';
 require __DIR__ . '/_es.php';
-need('admin', 'manajer');
+need('manajer');
 es_wajib_tersedia('Keputusan Waktu Order', 'es-order');
 
 page_start('Keputusan Waktu Order', 'es-order', 'Expert System: kapan waktu paling tepat order barang ke supplier, dihitung dari data TPS, OAS, KMS, MIS, dan DSS.');

@@ -90,10 +90,10 @@ Agar grafik dan perbandingan periode di MIS terisi, jalankan `data_simulasi.sql`
 
 | Halaman | Role | Isi |
 |---|---|---|
-| `es/konsultasi.php` · Konsultasi Produk | semua | 5 pertanyaan satu per satu + tingkat keyakinan → rekomendasi produk (CF, alasan, stok TPS, promo/bundling DSS), produk habis jadi permintaan, penelusuran aturan + sumber KMS |
-| `es/order.php` · Keputusan Waktu Order | manajer, admin | jalankan analisis, sinkron DSS, ringkasan K01–K06, tabel keputusan, detail perhitungan per produk, buat tugas order di OAS |
-| `es/riwayat.php` · Riwayat Konsultasi | semua (tugaskan: manajer/admin) | daftar & detail konsultasi, permintaan pembeli → tugas OAS gudang |
-| `es/basis.php` · Basis Pengetahuan | semua | pertanyaan → fakta, fakta otomatis + sumber modul, aturan JIKA–MAKA, kesimpulan, parameter engine |
+| `es/konsultasi.php` · Konsultasi Produk | pembeli (mandiri), staf, manajer, admin | 5 pertanyaan satu per satu + tingkat keyakinan → rekomendasi produk (CF, alasan, stok TPS, promo/bundling DSS), produk habis jadi permintaan, penelusuran aturan + sumber KMS |
+| `es/order.php` · Keputusan Waktu Order | manajer | jalankan analisis, sinkron DSS, ringkasan K01–K06, tabel keputusan, detail perhitungan per produk, buat tugas order di OAS |
+| `es/riwayat.php` · Riwayat Konsultasi | semua (pembeli: miliknya; tugaskan: manajer) | daftar & detail konsultasi, permintaan pembeli → tugas OAS gudang |
+| `es/basis.php` · Basis Pengetahuan | pegawai (bukan pembeli) | pertanyaan → fakta, fakta otomatis + sumber modul, aturan JIKA–MAKA, kesimpulan, parameter engine |
 
 **Integrasi:** keputusan order dan permintaan pembeli menjadi tugas `[ES]` di OAS untuk staf gudang; MIS Executive Dashboard dan Pusat Peringatan menampilkan hasil ES; DSS mengirim lead time/promo/bundling lewat `/api/es` dan menampilkan keputusan ES di halaman Rekomendasi Restok.
 
@@ -103,22 +103,27 @@ Agar grafik dan perbandingan periode di MIS terisi, jalankan `data_simulasi.sql`
 | Administrator | `admin` | `admin123` |
 | Manajer (Alysa Salsabila) | `manajer` | `manajer123` |
 | Staff (Rafa Fadhilah) | `staff` | `staff123` |
+| Pembeli (Rina Maharani) · dibuat oleh `es_database.sql` | `pembeli` | `pembeli123` |
 
 Di halaman login ada tombol **🔑 Akun uji coba** untuk mengisi otomatis.
 
 ## Hak akses per role
-| Menu | Admin | Manajer | Staff |
-|---|:-:|:-:|:-:|
-| Kasir & nota | ✅ | – | ✅ |
-| Riwayat transaksi | semua | semua | milik sendiri |
-| Produk & stok | tambah/ubah/arsip + restok | restok & koreksi | lihat |
-| Laporan penjualan (+CSV) | ✅ | ✅ | – |
-| Tugas | beri & pantau | beri & pantau | kerjakan |
-| Pengumuman & agenda | buat | buat | baca |
-| Dokumen & pesan | ✅ | ✅ | ✅ |
-| Tulis knowledge | langsung publish | langsung publish | menunggu review |
-| Review & kategori KMS | ✅ | ✅ | – |
-| User & role | ✅ | – | – |
+| Menu | Admin | Manajer | Staff | Pembeli |
+|---|:-:|:-:|:-:|:-:|
+| Kasir & nota | ✅ | – | ✅ | – |
+| Riwayat transaksi | semua | semua | milik sendiri | – |
+| Produk & stok | tambah/ubah/arsip + restok | restok & koreksi | lihat | – |
+| Laporan penjualan (+CSV) | ✅ | ✅ | – | – |
+| Tugas | beri & pantau | beri & pantau | kerjakan | – |
+| Pengumuman & agenda | buat | buat | baca | – |
+| Dokumen & pesan | ✅ | ✅ | ✅ | – |
+| Tulis knowledge | langsung publish | langsung publish | menunggu review | – |
+| Review & kategori KMS | ✅ | ✅ | – | – |
+| User & role | ✅ | – | – | – |
+| ES · Konsultasi Produk | ✅ | ✅ | ✅ (melayani pembeli) | ✅ (mandiri) |
+| ES · Riwayat Konsultasi | semua | semua + tugaskan permintaan | semua | milik sendiri |
+| ES · Keputusan Waktu Order | – | ✅ | – | – |
+| ES · Basis Pengetahuan | ✅ | ✅ | ✅ | – |
 
 ## Skenario demo (±5 menit)
 1. **Staff** → Kasir → klik produk → pilih *Tunai* → *Uang pas* → **Bayar & Cetak Nota**.

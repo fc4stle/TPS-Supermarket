@@ -40,5 +40,14 @@ if (!empty($_SESSION['uid'])) {
     if (!$GLOBALS['ME']) unset($_SESSION['uid']);
 }
 
+/* ---- Akun pembeli hanya boleh membuka halaman Expert System untuk pembeli ---- */
+if (($GLOBALS['ME']['role'] ?? '') === 'pembeli') {
+    $halaman = substr(str_replace('\\', '/', realpath($_SERVER['SCRIPT_FILENAME'] ?? '') ?: ''), strlen(str_replace('\\', '/', realpath(__DIR__ . '/..'))) + 1);
+    if (!in_array($halaman, ['es/konsultasi.php', 'es/riwayat.php', 'login.php', 'logout.php', 'index.php'], true)) {
+        header('Location: ' . BASE_URL . '/es/konsultasi.php');
+        exit;
+    }
+}
+
 /* ---- Semua form POST wajib membawa token CSRF ---- */
 verify_csrf();

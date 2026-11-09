@@ -46,11 +46,11 @@ function menu_items(string $active = ''): array
             ['kms-review', '📝', 'Review Knowledge', 'kms/index.php?tab=review', $boss, $review],
             ['kms-kategori', '🏷️', 'Kategori KMS', 'kms/kategori.php', $boss, 0],
         ]],
-        ['ES · Sistem Pakar', es_tersedia() ? [
-            ['es-konsultasi', '🧠', 'Konsultasi Produk', 'es/konsultasi.php', $all, 0],
-            ['es-order', '🗓️', 'Keputusan Waktu Order', 'es/order.php', $boss,
-                in_array($r, $boss, true) ? (int) val("SELECT COUNT(*) FROM v_es_order_terbaru WHERE kode_kesimpulan='K01' AND status='saran'") : 0],
-            ['es-riwayat', '🕘', 'Riwayat Konsultasi', 'es/riwayat.php', $all, 0],
+        [$r === 'pembeli' ? 'Asisten Belanja' : 'ES · Sistem Pakar', es_tersedia() ? [
+            ['es-konsultasi', '🧠', $r === 'pembeli' ? 'Cari Produk yang Cocok' : 'Konsultasi Produk', 'es/konsultasi.php', ['admin', 'manajer', 'staff', 'pembeli'], 0],
+            ['es-order', '🗓️', 'Keputusan Waktu Order', 'es/order.php', ['manajer'],
+                $r === 'manajer' ? (int) val("SELECT COUNT(*) FROM v_es_order_terbaru WHERE kode_kesimpulan='K01' AND status='saran'") : 0],
+            ['es-riwayat', '🕘', $r === 'pembeli' ? 'Riwayat Saya' : 'Riwayat Konsultasi', 'es/riwayat.php', ['admin', 'manajer', 'staff', 'pembeli'], 0],
             ['es-basis', '📐', 'Basis Pengetahuan', 'es/basis.php', $all, 0],
         ] : []],
         ['Master', [
@@ -109,7 +109,7 @@ function page_start(string $title, string $active = '', string $subtitle = ''): 
 
   <div class="main">
     <div class="promo-strip">
-      <span>🥬 Segar setiap hari</span><span>🏷️ Promo minggu ini</span><span>🛒 Belanja lengkap</span><span>💚 Selamat bekerja, <?= e(explode(' ', $u['nama'])[0]) ?>!</span>
+      <span>🥬 Segar setiap hari</span><span>🏷️ Promo minggu ini</span><span>🛒 Belanja lengkap</span><span>💚 <?= $u['role'] === 'pembeli' ? 'Selamat berbelanja' : 'Selamat bekerja' ?>, <?= e(explode(' ', $u['nama'])[0]) ?>!</span>
     </div>
     <header class="topbar">
       <button class="burger" type="button" onclick="document.body.classList.toggle('menu-open')" aria-label="Menu">☰</button>

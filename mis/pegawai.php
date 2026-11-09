@@ -16,7 +16,7 @@ $peg = rows("SELECT p.id, p.nama, p.role, p.jabatan,
         (SELECT COUNT(*) FROM artikel_kms a WHERE a.id_penulis=p.id AND a.status='published') published,
         (SELECT COUNT(*) FROM feedback_kms f WHERE f.id_pegawai=p.id AND DATE(f.dibuat) BETWEEN ? AND ?) feedback,
         (SELECT COUNT(*) FROM stok_log l WHERE l.id_pegawai=p.id AND l.jenis IN ('restok','koreksi') AND DATE(l.waktu) BETWEEN ? AND ?) stok
-    FROM pegawai p WHERE p.aktif=1 ORDER BY p.role, p.nama", [$d, $s, $d, $s, $d, $s, $d, $s, $d, $s, $d, $s, $d, $s, $d, $s]);
+    FROM pegawai p WHERE p.aktif=1 AND p.role!='pembeli' ORDER BY p.role, p.nama", [$d, $s, $d, $s, $d, $s, $d, $s, $d, $s, $d, $s, $d, $s, $d, $s]);
 
 if (get('export') === 'csv') {
     mis_csv('mis-kinerja-pegawai', ['Pegawai', 'Role', 'Jabatan', 'Transaksi', 'Omzet', 'Rata-rata Belanja', 'Tugas Jatuh Tempo', 'Tugas Selesai', 'Tepat Waktu', 'Tugas Terlambat (aktif)', 'Knowledge Baru', 'Knowledge Published', 'Feedback Diberikan', 'Restok/Koreksi'],

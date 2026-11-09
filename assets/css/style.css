@@ -626,3 +626,4 @@ details.es-det summary{cursor:pointer;font-weight:700;color:var(--g3)}
 .es-al{min-width:220px}
 .modules.six~.card .flow div{min-width:118px}
 @media (max-width:1100px){.es-rgrid{grid-template-columns:1fr}}
+.role-pill.pembeli{background:var(--ol);color:#9a3412}

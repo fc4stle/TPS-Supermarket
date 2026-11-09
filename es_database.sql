@@ -6,7 +6,7 @@
 --  Database ES dibuat di database MySQL yang sama (martoffice) dengan
 --  awalan tabel es_ agar dapat langsung memakai data modul sebelumnya:
 --    TPS : produk, stok, transaksi, detail_transaksi   (fakta produk & stok)
---    OAS : tugas, pegawai                               (tindak lanjut permintaan)
+--    OAS : tugas, pegawai                               (tindak lanjut permintaan; role pembeli ditambahkan)
 --    KMS : artikel_kms                                  (sumber pengetahuan pakar)
 --    MIS : aturan peringatan stok + view ringkasan ES   (pemantauan manajer)
 --    DSS : es_dss_sinkron                               (hasil DSS: supplier, promo, bundling, restok)
@@ -33,6 +33,16 @@ DROP TABLE IF EXISTS es_order_fakta, es_order_analisis, es_pengaturan, es_kesimp
                      es_dss_sinkron, es_aturan_syarat, es_aturan, es_produk_tag, es_tag,
                      es_pilihan, es_pertanyaan, es_fakta, es_menu;
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ---------------------------------------------------------------------
+-- 0. ROLE PEMBELI (pengguna menu 1). Pembeli login dengan akun sendiri dan
+--    hanya dapat membuka Konsultasi Produk dan riwayat konsultasinya.
+--    Akun uji coba: pembeli / pembeli123
+-- ---------------------------------------------------------------------
+ALTER TABLE pegawai MODIFY role ENUM('admin','manajer','staff','pembeli') NOT NULL;
+INSERT INTO pegawai (nama, username, password, role, jabatan)
+SELECT 'Rina Maharani', 'pembeli', '$2y$12$sKuPGbA5dXCqvOgFJPM7nuOR4gzrIt7.v.owifJsEJZ7RzrXl8eti', 'pembeli', 'Pelanggan'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM pegawai WHERE username='pembeli');
 
 -- ---------------------------------------------------------------------
 -- 1. MENU sistem pakar (menu 1 dibuat sekarang, menu lain menyusul)

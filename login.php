@@ -71,6 +71,7 @@ unset($_SESSION['last_user']);
         <button type="button" class="sm ghost" onclick="isi('admin','admin123')">Administrator</button>
         <button type="button" class="sm ghost" onclick="isi('manajer','manajer123')">Manajer</button>
         <button type="button" class="sm ghost" onclick="isi('staff','staff123')">Staff</button>
+        <button type="button" class="sm ghost" onclick="isi('pembeli','pembeli123')">Pembeli</button>
       </details>
     </div>
   </section>

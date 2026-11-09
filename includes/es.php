@@ -220,7 +220,7 @@ function es_konsultasi_simpan(int $pegawai, array $jawaban, string $pelanggan = 
 
 function es_konsultasi_detail(int $id): ?array
 {
-    $k = row('SELECT k.*, g.nama pegawai FROM es_konsultasi k JOIN pegawai g ON g.id=k.id_pegawai WHERE k.id=?', [$id]);
+    $k = row('SELECT k.*, g.nama pegawai, g.role role_pegawai FROM es_konsultasi k JOIN pegawai g ON g.id=k.id_pegawai WHERE k.id=?', [$id]);
     if (!$k) return null;
     $k['fakta'] = rows('SELECT kf.kode_fakta, f.nama, kf.cf_pengguna FROM es_konsultasi_fakta kf JOIN es_fakta f ON f.kode=kf.kode_fakta WHERE kf.id_konsultasi=? ORDER BY f.kode', [$id]);
     $k['hasil'] = rows('SELECT h.peringkat, h.cf_akhir, h.alasan, h.stok_saat_itu, h.dibeli, p.id id_produk, p.nama, p.harga, p.satuan

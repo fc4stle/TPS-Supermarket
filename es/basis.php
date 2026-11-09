@@ -2,7 +2,7 @@
 /* Basis pengetahuan ES: pertanyaan, fakta, aturan, kesimpulan, dan parameter engine. */
 require __DIR__ . '/../includes/app.php';
 require __DIR__ . '/_es.php';
-need();
+need('admin', 'manajer', 'staff');
 es_wajib_tersedia('Basis Pengetahuan', 'es-basis');
 
 page_start('Basis Pengetahuan', 'es-basis', 'Expert System: isi pengetahuan pakar yang dipakai engine. Setiap aturan merujuk ke artikel KMS.');
